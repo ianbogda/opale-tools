@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+  <meta charset="utf-8">
+  <title>Outils</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABTUlEQVRYR+2XvQ3CMBBF38QAJJ2AElkAJZACk7ACp7ACJ2ABJ2AElkAJZACkzC9KpFJXrI1fZ7z8+8kHh5gKkP4gB+ANcA1y9kJ3B6E7A9wB1j5kK6gHcAZo4y4R7rL7Z4A0wB2jD6JpJtQ2Y7x4J0AEsA9YxqkC2J9E6k1Q0wE0gM4bZC5iFZk4b4J0AEsA9YxqkC2J9E6k1Q0wE0gM4bZC5iFZk4b4J0AEsA9YxqkC2J9E6k1Q0wE0gM4bZC5iFZk4b4J0AF8Fv1m7z3s7wAAAABJRU5ErkJggg==">
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+body
+{
+  background: #f7f8fb;
+}
+
+.app-frame
+{
+  height: calc(100vh - 56px);
+  /* hauteur navbar */
+}
+
+.frame-card
+{
+  height: 100%;
+  background: #fff;
+  border-radius: .75rem;
+  box-shadow: 0 .25rem 1rem rgba(0, 0, 0, .06);
+  display: flex;
+  flex-direction: column;
+}
+
+.frame-card-header
+{
+  padding: .6rem .9rem;
+  border-bottom: 1px solid #eef0f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.frame-card-body
+{
+  flex: 1;
+  padding: .75rem;
+}
+
+iframe
+{
+  width: 100%;
+  height: 100%;
+  border: 1px solid #eef0f6;
+  border-radius: .5rem;
+  background: #fff;
+}
+
+/* fallback */
+.fallback
+{
+  position: absolute;
+  inset: 0;
+  background: #fafafa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  display: flex;
+  flex-direction: column;
+}
+
+.hidden
+{
+  display: none;
+}
+
+.hud
+{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.game
+{
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.ground
+{
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  height: 2px;
+  background: #222;
+  opacity: .35;
+}
+
+.dragon
+{
+  position: absolute;
+  left: 40px;
+  bottom: 50px;
+  font-size: 56px;
+  line-height: 1;
+  transform: translateY(0);
+  will-change: transform;
+  user-select: none;
+}
+
+.dragon.running
+{
+  animation: run-bob 250ms infinite alternate;
+}
+
+@keyframes run-bob
+{
+  from
+  {
+    transform: translateY(0);
+  }
+
+  to
+  {
+    transform: translateY(-2px);
+  }
+}
+
+.dragon.jump
+{
+  animation: jump 520ms cubic-bezier(.2, .6, .2, 1) forwards;
+}
+
+@keyframes jump
+{
+  0%
+  {
+    transform: translateY(0);
+  }
+
+  45%
+  {
+    transform: translateY(-110px);
+  }
+
+  100%
+  {
+    transform: translateY(0);
+  }
+}
+
+.obstacle
+{
+  position: absolute;
+  right: -60px;
+  bottom: 52px;
+  font-size: 42px;
+  line-height: 1;
+  user-select: none;
+  will-change: transform;
+}
+
+.tip
+{
+  position: absolute;
+  bottom: 10px;
+  opacity: .75;
+  font-size: 13px;
+}
+
+.game.over .tip
+{
+  font-size: 14px;
+  opacity: 1;
+}
+  </style>
+</head>
+
+<body>
+  <!-- ================= NAVBAR ================= -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-semibold" href="#/">Outils</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="menu"></ul>
+        <span class="navbar-text small text-muted" id="currentPath"></span>
+      </div>
+    </div>
+  </nav>
+  <!-- ================= CONTENT ================= -->
+  <div class="app-frame">
+    <iframe id="frame"></iframe>
+    <div id="fallback" class="fallback hidden" aria-live="polite">
+      <div class="hud">
+        <div>🐉 DRAGON OFFLINE</div>
+        <div>Score: <span id="score">0</span></div>
+      </div>
+      <div id="game" class="game" role="application" aria-label="Mini-jeu du dragon offline">
+        <div id="dragon" class="dragon" aria-label="Dragon">🐉</div>
+        <div id="obstacle" class="obstacle" aria-label="Obstacle">🪨</div>
+        <div class="ground"></div>
+        <div id="tip" class="tip">Espace / ↑ pour sauter — R pour rejouer</div>
+      </div>
+    </div>
+  </div>
+  <!-- ================= SCRIPT ================= -->
+  <script>
+/**
+ * Shell Router (local file:// friendly)
+ * - Menu Bootstrap (top navbar) + active state
+ * - Hash routing: #/route
+ * - Iframe same-origin
+ * - URL shell suit la navigation iframe (interception + sync on load)
+ * - Ouverture standalone
+ *
+ * Requis dans le DOM:
+ *   #menu (ul.navbar-nav)
+ *   #frame (iframe)
+ *   #currentLabel, #currentRoute, #currentPath (optionnels mais gérés)
+ *   #openStandalone (button optionnel)
+ */
+(() =>
+{
+  "use strict";
+  /* ================= CONFIG ================= */
+  const TOOL_GROUPS = [
+  {
+    type: "links",
+    items: [
+    {
+      label: "Accueil",
+      route: "",
+      file: "home.html"
+    },
+    {
+      label: "Tableau de bord",
+      route: "tdb-opale",
+      file: "tdb-opale.html"
+    },
+    {
+      label: "IBAN Analyzer",
+      route: "iban-analyzer",
+      file: "iban-analyzer.html"
+    },
+    {
+      label: "Crédit nourriture",
+      route: "creditnourriture",
+      file: "creditnourriture.html"
+    }, ],
+  },
+  {
+    type: "dropdown",
+    label: "Outils avancés",
+    items: [
+    {
+      label: "M@TRISK",
+      route: "matrix",
+      file: "matrix.html"
+    },
+    {
+      label: "Contrôle interne",
+      route: "controle-interne",
+      file: "controleinterne.html"
+    },
+    {
+      label: "YCRINT",
+      route: "ycrint-analyzer",
+      file: "ycrint-analyzer.html"
+    }, ],
+  }, ];
+  // Timeout avant fallback (ms)
+  const IFRAME_FAIL_TIMEOUT = 3500;
+  /* ================= ELEMENTS ================= */
+  const els = {
+    menu: document.getElementById("menu"),
+    frame: document.getElementById("frame"),
+    currentLabel: document.getElementById("currentLabel"),
+    currentRoute: document.getElementById("currentRoute"),
+    currentPath: document.getElementById("currentPath"),
+    openStandalone: document.getElementById("openStandalone"),
+  };
+  if(!els.menu || !els.frame)
+  {
+    console.error("Shell Router: éléments requis manquants (#menu, #frame).");
+    return;
+  }
+  /* ================= INDEXES ================= */
+  const allTools = TOOL_GROUPS.flatMap(g => g.items);
+  const byRoute = new Map(allTools.map(t => [t.route, t]));
+  const byFile = new Map(allTools.map(t => [t.file, t]));
+  // ===== Bridge navigation iframe -> shell (works when file:// iframe is cross-origin "null") =====
+  window.addEventListener("message", (event) =>
+  {
+    const data = event.data;
+    if(!data || data.type !== "shell:navigate") return;
+    // data.file expected like "iban-analyzer.html" (preferred)
+    const file = String(data.file || "").trim();
+    if(!file) return;
+    const tool = byFile.get(file);
+    if(!tool) return;
+    navigateTo(tool,
+    {
+      replace: false,
+      pushHash: true
+    });
+  });
+  /* ================= ROUTER (hash) ================= */
+  function routeFromHash()
+  {
+    const m = location.hash.match(/^#\/?(.*)$/);
+    return (m && m[1] != null) ? m[1] : "";
+  }
+
+  function setRoute(route, replace = false)
+  {
+    const h = "#/" + (route || "");
+    if(replace) history.replaceState(
+    {}, "", h);
+    else location.hash = h;
+  }
+
+  function safeBasename(pathname)
+  {
+    const parts = String(pathname || "").split("/").filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : "";
+  }
+
+  function setUi(tool)
+  {
+    if(!tool) return;
+    if(els.currentLabel) els.currentLabel.textContent = tool.label;
+    if(els.currentRoute) els.currentRoute.textContent = tool.route || "/";
+    if(els.currentPath) els.currentPath.textContent = `#/${tool.route || ""}`;
+    document.title = tool.label ? `Outils — ${tool.label}` : "Outils";
+  }
+  /* ================= MENU ================= */
+  function renderMenu(activeRoute)
+  {
+    els.menu.innerHTML = "";
+    for(const group of TOOL_GROUPS)
+    {
+      if(group.type === "links")
+      {
+        group.items.forEach(t =>
+        {
+          const li = document.createElement("li");
+          li.className = "nav-item";
+          li.innerHTML = `
+            <a class="nav-link ${t.route === activeRoute ? "active" : ""}"
+               href="#/${t.route}">
+               ${t.label}
+            </a>
+          `;
+          els.menu.appendChild(li);
+        });
+        continue;
+      }
+      if(group.type === "dropdown")
+      {
+        const isActive = group.items.some(i => i.route === activeRoute);
+        const li = document.createElement("li");
+        li.className = "nav-item dropdown";
+        li.innerHTML = `
+          <a class="nav-link dropdown-toggle ${isActive ? "active" : ""}"
+             href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+             ${group.label}
+          </a>
+          <ul class="dropdown-menu">
+            ${group.items.map(i => `
+              <li><a class="dropdown-item" href="#/${i.route}">${i.label}</a></li>
+            `).join("")}
+          </ul>
+        `;
+        els.menu.appendChild(li);
+      }
+    }
+  }
+  /* ================= FALLBACK UI + MINI JEU ================= */
+  // État watchdog / jeu (global au shell)
+  const fb = {
+    overlay: null,
+    scoreEl: null,
+    gameEl: null,
+    dragonEl: null,
+    obstacleEl: null,
+    tipEl: null,
+    // watchdog
+    loadToken: 0,
+    loadTimer: null,
+    loadedForToken: false,
+    // game loop
+    running: false,
+    rafId: null,
+    lastTs: 0,
+    score: 0,
+    speed: 6,
+    obstacleX: 0,
+    obstacleGap: 0,
+    jumpLock: false,
+    // listeners
+    keyHandler: null,
+  };
+
+  function ensureIframeWrapper()
+  {
+    // On veut un conteneur position:relative autour de l’iframe.
+    // Si ton HTML a déjà un wrapper, on le réutilise; sinon on en crée un.
+    const frame = els.frame;
+    // Déjà wrapper ?
+    if(frame.parentElement && frame.parentElement.classList.contains("iframe-wrapper"))
+    {
+      return frame.parentElement;
+    }
+    // Créer wrapper
+    const wrapper = document.createElement("div");
+    wrapper.className = "iframe-wrapper";
+    wrapper.style.position = "relative";
+    wrapper.style.width = "100%";
+    wrapper.style.height = "100%";
+    // remplace l’iframe par wrapper + remet l’iframe dedans
+    const parent = frame.parentElement;
+    parent.insertBefore(wrapper, frame);
+    wrapper.appendChild(frame);
+    // si l’iframe avait des styles de taille, laisse l’iframe gérer; wrapper suit
+    return wrapper;
+  }
+
+  function injectFallbackStylesOnce()
+  {
+    if(document.getElementById("__dragonFallbackStyles")) return;
+    const style = document.createElement("style");
+    style.id = "__dragonFallbackStyles";
+    style.textContent = `
+      .shell-fallback {
+        position:absolute; inset:0;
+        background:#fafafa;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+        display:flex; flex-direction:column;
+        z-index: 999;
+      }
+      .shell-fallback.hidden { display:none; }
+      .shell-fallback .hud {
+        display:flex; justify-content:space-between; align-items:center;
+        padding:10px 12px; border-bottom:1px solid #e5e5e5;
+      }
+      .shell-fallback .game {
+        position:relative; flex:1; overflow:hidden;
+        display:flex; align-items:flex-end; justify-content:center;
+      }
+      .shell-fallback .ground {
+        position:absolute; left:0; right:0; bottom:44px;
+        height:2px; background:#222; opacity:.35;
+      }
+      .shell-fallback .dragon {
+        position:absolute; left:40px; bottom:50px;
+        font-size:56px; line-height:1;
+        will-change: transform;
+        user-select:none;
+      }
+      .shell-fallback .dragon.running {
+        animation: run-bob 250ms infinite alternate;
+      }
+      @keyframes run-bob { from{transform:translateY(0)} to{transform:translateY(-2px)} }
+      .shell-fallback .dragon.jump {
+        animation: jump 520ms cubic-bezier(.2,.6,.2,1) forwards;
+      }
+      @keyframes jump {
+        0%{transform:translateY(0)} 45%{transform:translateY(-110px)} 100%{transform:translateY(0)}
+      }
+      .shell-fallback .obstacle {
+        position:absolute; right:-60px; bottom:52px;
+        font-size:42px; line-height:1;
+        user-select:none;
+        will-change: transform;
+      }
+      .shell-fallback .tip {
+        position:absolute; bottom:10px;
+        opacity:.75; font-size:13px;
+      }
+      .shell-fallback .game.over .tip { font-size:14px; opacity:1; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function ensureFallbackUI()
+  {
+    if(fb.overlay) return;
+    const wrapper = ensureIframeWrapper();
+    injectFallbackStylesOnce();
+    const overlay = document.createElement("div");
+    overlay.className = "shell-fallback hidden";
+    overlay.setAttribute("aria-live", "polite");
+    overlay.innerHTML = `
+      <div class="hud">
+        <div>🐉 DRAGON OFFLINE</div>
+        <div>Score: <span id="__dragonScore">0</span></div>
+      </div>
+
+      <div id="__dragonGame" class="game" role="application" aria-label="Mini-jeu du dragon offline">
+        <div id="__dragon" class="dragon" aria-label="Dragon">🐉</div>
+        <div id="__obstacle" class="obstacle" aria-label="Obstacle">🪨</div>
+        <div class="ground"></div>
+        <div id="__dragonTip" class="tip">Espace / ↑ pour sauter — R pour rejouer</div>
+      </div>
+    `;
+    wrapper.appendChild(overlay);
+    fb.overlay = overlay;
+    fb.scoreEl = overlay.querySelector("#__dragonScore");
+    fb.gameEl = overlay.querySelector("#__dragonGame");
+    fb.dragonEl = overlay.querySelector("#__dragon");
+    fb.obstacleEl = overlay.querySelector("#__obstacle");
+    fb.tipEl = overlay.querySelector("#__dragonTip");
+  }
+
+  function showFallbackAndStartGame()
+  {
+    ensureFallbackUI();
+    fb.overlay.classList.remove("hidden");
+    startGame();
+  }
+
+  function hideFallbackAndStopGame()
+  {
+    if(fb.overlay) fb.overlay.classList.add("hidden");
+    stopGame();
+  }
+
+  function armIframeWatchdog()
+  {
+    // Nouveau token pour invalider les anciens timers
+    fb.loadToken += 1;
+    const token = fb.loadToken;
+    fb.loadedForToken = false;
+    if(fb.loadTimer) clearTimeout(fb.loadTimer);
+    fb.loadTimer = setTimeout(() =>
+    {
+      // si c’est toujours le token courant et pas chargé -> fallback
+      if(fb.loadToken === token && !fb.loadedForToken)
+      {
+        // masque iframe pour éviter un “cadre blanc”
+        els.frame.style.display = "none";
+        showFallbackAndStartGame();
+      }
+    }, IFRAME_FAIL_TIMEOUT);
+  }
+
+  function markIframeLoaded()
+  {
+    // Marque le token courant comme OK + nettoie
+    fb.loadedForToken = true;
+    if(fb.loadTimer)
+    {
+      clearTimeout(fb.loadTimer);
+      fb.loadTimer = null;
+    }
+    // réaffiche iframe si elle était masquée
+    els.frame.style.display = "";
+    hideFallbackAndStopGame();
+  }
+  /* ================= MINI JEU (engine) ================= */
+  function startGame()
+  {
+    // idempotent
+    if(!fb.gameEl || !fb.dragonEl || !fb.obstacleEl) return;
+    stopGame(); // reset propre si relancé
+    fb.running = true;
+    fb.lastTs = 0;
+    fb.score = 0;
+    fb.speed = 6;
+    fb.obstacleX = 0;
+    fb.obstacleGap = 0;
+    fb.jumpLock = false;
+    fb.scoreEl.textContent = "0";
+    fb.tipEl.textContent = "Espace / ↑ pour sauter — R pour rejouer";
+    fb.gameEl.classList.remove("over");
+    fb.dragonEl.className = "dragon running";
+    resetObstacle(true);
+    fb.keyHandler = (e) =>
+    {
+      const code = e.code || e.key;
+      if(code === "Space" || code === "ArrowUp")
+      {
+        e.preventDefault();
+        jump();
+      }
+      else if(code === "KeyR")
+      {
+        e.preventDefault();
+        restart();
+      }
+    };
+    window.addEventListener("keydown", fb.keyHandler,
+    {
+      passive: false
+    });
+    fb.rafId = requestAnimationFrame(loop);
+  }
+
+  function stopGame()
+  {
+    fb.running = false;
+    if(fb.rafId) cancelAnimationFrame(fb.rafId);
+    fb.rafId = null;
+    if(fb.keyHandler) window.removeEventListener("keydown", fb.keyHandler);
+    fb.keyHandler = null;
+  }
+
+  function resetObstacle(first = false)
+  {
+    fb.obstacleX = 0;
+    fb.obstacleGap = first ? 420 : (260 + Math.random() * 320);
+    fb.obstacleEl.style.transform = `translateX(${fb.obstacleX}px)`;
+  }
+
+  function jump()
+  {
+    if(!fb.running || fb.jumpLock) return;
+    fb.jumpLock = true;
+    fb.dragonEl.classList.remove("running");
+    fb.dragonEl.classList.add("jump");
+    setTimeout(() =>
+    {
+      fb.dragonEl.classList.remove("jump");
+      if(fb.running) fb.dragonEl.classList.add("running");
+      fb.jumpLock = false;
+    }, 520);
+  }
+
+  function endGame()
+  {
+    fb.running = false;
+    fb.gameEl.classList.add("over");
+    fb.dragonEl.classList.remove("running");
+    fb.tipEl.textContent = `💥 Crash ! Score ${fb.score}. Appuie sur R pour rejouer.`;
+    if(fb.rafId) cancelAnimationFrame(fb.rafId);
+    fb.rafId = null;
+  }
+
+  function restart()
+  {
+    if(!fb.overlay || fb.overlay.classList.contains("hidden")) return;
+    startGame();
+  }
+
+  function isColliding()
+  {
+    const dRect = fb.dragonEl.getBoundingClientRect();
+    const oRect = fb.obstacleEl.getBoundingClientRect();
+    // “shrink” hitboxes (emoji => bounding box un peu large)
+    const d = {
+      left: dRect.left + 10,
+      right: dRect.right - 10,
+      top: dRect.top + 10,
+      bottom: dRect.bottom - 6,
+    };
+    const o = {
+      left: oRect.left + 8,
+      right: oRect.right - 8,
+      top: oRect.top + 8,
+      bottom: oRect.bottom - 8,
+    };
+    return !(d.right < o.left || d.left > o.right || d.bottom < o.top || d.top > o.bottom);
+  }
+
+  function loop(ts)
+  {
+    if(!fb.running) return;
+    if(!fb.lastTs) fb.lastTs = ts;
+    const dt = Math.min(32, ts - fb.lastTs);
+    fb.lastTs = ts;
+    // score + speed scaling
+    fb.score += Math.round(dt / 16);
+    fb.scoreEl.textContent = String(fb.score);
+    fb.speed = 6 + Math.min(10, fb.score / 400); // max ~16
+    // move obstacle left
+    fb.obstacleX -= fb.speed * (dt / 16);
+    fb.obstacleEl.style.transform = `translateX(${fb.obstacleX}px)`;
+    const oRect = fb.obstacleEl.getBoundingClientRect();
+    const gRect = fb.gameEl.getBoundingClientRect();
+    const obstacleOffLeft = oRect.right < gRect.left;
+    if(obstacleOffLeft)
+    {
+      fb.obstacleX = 0;
+      fb.obstacleGap = 260 + Math.random() * 340;
+      fb.obstacleX += fb.obstacleGap; // “teleport” à droite
+      fb.obstacleEl.style.transform = `translateX(${fb.obstacleX}px)`;
+    }
+    if(isColliding())
+    {
+      endGame();
+      return;
+    }
+    fb.rafId = requestAnimationFrame(loop);
+  }
+  /* ================= NAVIGATION ================= */
+  function navigateTo(tool, opts = {})
+  {
+    const
+    {
+      replace = false, pushHash = true
+    } = opts;
+    if(!tool) return;
+    // reset fallback à chaque nav
+    hideFallbackAndStopGame();
+    // iframe: évite reload inutile
+    const currentSrc = els.frame.getAttribute("src") || "";
+    if(!currentSrc.endsWith(tool.file))
+    {
+      // arme le watchdog AVANT de changer src
+      armIframeWatchdog();
+      els.frame.setAttribute("src", tool.file);
+    }
+    else
+    {
+      // même fichier: considère “ok”
+      markIframeLoaded();
+    }
+    if(pushHash) setRoute(tool.route, replace);
+    renderMenu(tool.route);
+    setUi(tool);
+  }
+
+  function navigateToRoute(route, replace = true)
+  {
+    const tool = byRoute.get(route) || allTools[0];
+    navigateTo(tool,
+    {
+      replace,
+      pushHash: true
+    });
+  }
+  /* ================= IFRAME SYNC (fallback) ================= */
+  function syncFromIframe(replace = true)
+  {
+    // same-origin attendu
+    const inner = new URL(els.frame.contentWindow.location.href);
+    const file = safeBasename(inner.pathname);
+    if(!file || !file.toLowerCase().endsWith(".html")) return;
+    const tool = byFile.get(file);
+    if(!tool) return;
+    const current = routeFromHash();
+    if(current !== tool.route)
+    {
+      setRoute(tool.route, replace);
+      renderMenu(tool.route);
+      setUi(tool);
+    }
+  }
+  /* ================= IFRAME CLICK INTERCEPT ================= */
+  function installIframeInterceptor()
+  {
+    const doc = els.frame.contentDocument;
+    if(!doc || doc.__shellNavInterceptorInstalled) return;
+    doc.__shellNavInterceptorInstalled = true;
+    doc.addEventListener("click", (e) =>
+    {
+      const a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if(!a) return;
+      if(e.defaultPrevented) return;
+      if(e.button !== 0) return;
+      if(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if(a.target && a.target !== "_self") return;
+      const href = a.getAttribute("href") || "";
+      if(!href) return;
+      const h = href.toLowerCase();
+      if(h.startsWith("#") || h.startsWith("mailto:") || h.startsWith("tel:") || h.startsWith("javascript:")) return;
+      let url;
+      try
+      {
+        url = new URL(href, els.frame.contentWindow.location.href);
+      }
+      catch
+      {
+        return;
+      }
+      const file = safeBasename(url.pathname);
+      if(!file || !file.toLowerCase().endsWith(".html")) return;
+      const tool = byFile.get(file);
+      if(!tool) return;
+      e.preventDefault();
+      navigateTo(tool,
+      {
+        replace: false,
+        pushHash: true
+      });
+    }, true);
+  }
+  /* ================= EVENTS ================= */
+  window.addEventListener("hashchange", () =>
+  {
+    navigateToRoute(routeFromHash(), true);
+  });
+  els.frame.addEventListener("load", () =>
+  {
+    // IMPORTANT: un load “réel” => stop fallback
+    markIframeLoaded();
+    try
+    {
+      installIframeInterceptor();
+      syncFromIframe(true);
+    }
+    catch (err)
+    {
+      // si un navigateur bloque l'accès file://, on ignore sans casser
+      console.warn("Shell Router: accès iframe bloqué (file://). Bridge postMessage recommandé.", err);
+    }
+  });
+  if(els.openStandalone)
+  {
+    els.openStandalone.addEventListener("click", () =>
+    {
+      const r = routeFromHash();
+      const tool = byRoute.get(r) || allTools[0];
+      if(tool) window.open(tool.file, "_blank", "noopener");
+    });
+  }
+  // === Cross-origin safe navigation bridge (works with file:// iframe restrictions) ===
+  window.addEventListener("message", (event) =>
+  {
+    const data = event.data;
+    if(!data || data.type !== "shell:navigate") return;
+    // data.href can be "iban-analyzer.html" or a file://... URL
+    let url;
+    try
+    {
+      url = new URL(data.href, location.href);
+    }
+    catch
+    {
+      return;
+    }
+    const file = safeBasename(url.pathname);
+    const tool = byFile.get(file);
+    if(!tool) return;
+    navigateTo(tool,
+    {
+      replace: false,
+      pushHash: true
+    });
+  });
+  /* ================= INIT ================= */
+  // Prépare UI fallback (sans l’afficher)
+  ensureFallbackUI();
+  const init = routeFromHash();
+  navigateToRoute(init, true);
+})();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
