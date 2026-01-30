@@ -1,894 +1,1470 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Crédit nourriture – Pilotage SRH (OP@LE / CLCA)</title>
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SRH – Crédit nourriture (V2)</title>
 
-  <!-- Bootstrap 5 (même base que la page de référence) -->
+  <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <!-- Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
   <!-- SheetJS (XLSX) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
     :root{
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.4;
+      --app-bg:#f7f8fb;
+      --app-card:#ffffff;
     }
-    body{
-      background:#f7f8fb;
-      padding-bottom:6rem;
+    body{ background:var(--app-bg); }
+    .app-header{
+      background: linear-gradient(180deg, #ffffff 0%, #f6f7fb 100%);
+      border-bottom: 1px solid rgba(0,0,0,.08);
     }
-    .page{
-      background:#fff;
-      border-radius:0.75rem;
-      box-shadow:0 .25rem 1rem rgba(0,0,0,.06);
-      padding:1.5rem;
+    .card{
+      background: var(--app-card);
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 14px;
     }
-    .muted-hint{ color:#6c757d; font-size:.925rem; }
-    .kpi{
-      background:#fff;
-      border:1px solid #eef1f6;
-      border-radius:0.75rem;
-      padding:1rem;
-      box-shadow:0 .15rem .75rem rgba(0,0,0,.04);
+    .card .card-header{
+      background: rgba(0,0,0,.02);
+      border-bottom: 1px solid rgba(0,0,0,.06);
+      border-top-left-radius: 14px;
+      border-top-right-radius: 14px;
+      font-weight: 600;
     }
-    .kpi .label{ color:#6c757d; font-size:.9rem; }
-    .kpi .value{ font-size:1.35rem; font-weight:700; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .table thead th{
-      background:#f4f6fa;
-      border-bottom:1px solid #e8ecf5;
-    }
-    .sticky-actions{
-      position:fixed; left:0; right:0; bottom:0;
-      background:rgba(247,248,251,.95);
-      backdrop-filter: blur(6px);
-      border-top:1px solid #e8ecf5;
-      padding:.75rem 0;
-      z-index: 50;
+      background: rgba(0,0,0,.03);
+      border-bottom: 1px solid rgba(0,0,0,.08);
+      white-space: nowrap;
     }
     .badge-soft{
-      background:#eef3ff; color:#274690; border:1px solid #dbe6ff;
-      font-weight:600;
+      background: rgba(13,110,253,.10);
+      color: rgba(13,110,253,1);
+      border: 1px solid rgba(13,110,253,.20);
     }
-    .form-control, .form-select{
-      border-radius:.6rem;
+    .sticky-actions{
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+      background: rgba(247,248,251,.92);
+      backdrop-filter: blur(6px);
+      border-top: 1px solid rgba(0,0,0,.08);
     }
-    .btn{
-      border-radius:.6rem;
+    .form-text{ color: rgba(0,0,0,.6); }
+    .kpi{
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 12px;
+      background: rgba(0,0,0,.02);
+      padding: .75rem;
+      height: 100%;
     }
-    .nav-pills .nav-link{
-      border-radius:.75rem;
-    }
-    .smallcap{ font-variant-caps: all-small-caps; letter-spacing:.03em; }
   </style>
 </head>
 
 <body>
-<div class="container my-4">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <div>
-      <h1 class="h3 mb-1">Crédit nourriture – Pilotage SRH</h1>
-      <div class="muted-hint">
-        Import CLCA (OP@LE) + prévision recettes SRH (tickets/forfaits/CFA/commensaux) + calcul crédit nourriture.
-      </div>
-    </div>
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary" id="btnExportJSON"><i class="bi bi-download"></i> Export JSON</button>
-      <label class="btn btn-outline-secondary mb-0">
-        <i class="bi bi-upload"></i> Import JSON
-        <input type="file" id="importJSON" accept="application/json" hidden>
-      </label>
-      <button class="btn btn-primary" id="btnSave"><i class="bi bi-check2-circle"></i> Sauvegarder</button>
-    </div>
-  </div>
-
-  <div class="page">
-
-    <ul class="nav nav-pills gap-2 mb-3" id="tabs">
-      <li class="nav-item"><button class="nav-link active" data-tab="tab-kpi"><i class="bi bi-speedometer2"></i> Synthèse</button></li>
-      <li class="nav-item"><button class="nav-link" data-tab="tab-periodes"><i class="bi bi-calendar3"></i> Périodes & vacances</button></li>
-      <li class="nav-item"><button class="nav-link" data-tab="tab-tarifs"><i class="bi bi-cash-coin"></i> Tarifs</button></li>
-      <li class="nav-item"><button class="nav-link" data-tab="tab-volumes"><i class="bi bi-box-seam"></i> Volumes & recettes</button></li>
-      <li class="nav-item"><button class="nav-link" data-tab="tab-clca"><i class="bi bi-file-earmark-spreadsheet"></i> Import CLCA & dépenses</button></li>
-      <li class="nav-item"><button class="nav-link" data-tab="tab-credit"><i class="bi bi-calculator"></i> Crédit nourriture</button></li>
-      <li class="nav-item"><button class="nav-link" data-tab="tab-ratios"><i class="bi bi-graph-up"></i> Ratios</button></li>
-      <li class="nav-item"><button class="nav-link" data-tab="tab-param"><i class="bi bi-sliders"></i> Paramètres</button></li>
-    </ul>
-
-    <!-- ===================== Synthèse ===================== -->
-    <section id="tab-kpi" class="tab-section">
-      <div class="row g-3">
-        <div class="col-12 col-lg-4">
-          <div class="kpi">
-            <div class="label">Recettes SRH prévues (période sélectionnée)</div>
-            <div class="value" id="kpiRecettesPrevues">—</div>
-            <div class="muted-hint">Calculées via volumes × tarifs (tickets/forfaits/CFA/commensaux + extra).</div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="kpi">
-            <div class="label">Dépenses “Crédit nourriture” (engagées / consommées)</div>
-            <div class="value" id="kpiDepCN">—</div>
-            <div class="muted-hint">À partir de CLCA (comptes CN configurables).</div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="kpi">
-            <div class="label">Crédit nourriture disponible (réalisé)</div>
-            <div class="value" id="kpiCreditDispo">—</div>
-            <div class="muted-hint">Ressources réalisées − Reversement − Hors CN − Dépenses CN.</div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-4">
-
-      <div class="row g-3 align-items-end">
-        <div class="col-12 col-lg-4">
-          <label class="form-label">Période active (pour KPIs)</label>
-          <select class="form-select" id="activePeriode"></select>
-        </div>
-        <div class="col-12 col-lg-8">
-          <div class="alert alert-info mb-0">
-            <div class="d-flex gap-2 align-items-start">
-              <i class="bi bi-info-circle mt-1"></i>
-              <div>
-                <div><strong>Logique de calcul</strong> : l’outil vous donne un prévisionnel SRH (recettes) et rapproche les dépenses issues de CLCA, puis calcule un <strong>crédit nourriture</strong> prévisionnel et réalisé.</div>
-                <div class="muted-hint mt-1">Pour être robuste à vos exports CLCA, vous mappez les colonnes après import (section “Import CLCA & dépenses”).</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== Périodes & vacances ===================== -->
-    <section id="tab-periodes" class="tab-section d-none">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div class="app-header">
+    <div class="container py-4">
+      <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
         <div>
-          <h2 class="h5 mb-1">Périodes scolaires & vacances</h2>
-          <div class="muted-hint">Les vacances “coupent” le service : on exclut ces dates des jours de restauration.</div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge badge-soft rounded-pill"><i class="bi bi-clipboard-data me-1"></i> SRH – Pilotage</span>
+          </div>
+          <h1 class="h3 mb-1 mt-2">Crédit nourriture – Réel vs Prévisionnel</h1>
+          <div class="text-muted">
+            Outil souple : import <span class="mono">CLCA</span> + restitution budgétaire SRH, règles de classement, tableau & graphique,
+            alerte dynamique et recommandation TR.
+          </div>
         </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-primary" id="btnAddPeriode"><i class="bi bi-plus-circle"></i> Ajouter une période</button>
-          <button class="btn btn-outline-primary" id="btnAddVac"><i class="bi bi-plus-circle"></i> Ajouter vacances</button>
+
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-outline-primary" id="btnExport">
+            <i class="bi bi-download me-1"></i> Télécharger le suivi (JSON)
+          </button>
+          <label class="btn btn-outline-secondary mb-0">
+            <i class="bi bi-upload me-1"></i> Charger un suivi
+            <input type="file" id="fileImportState" accept=".json" hidden>
+          </label>
+          <button class="btn btn-primary" id="btnRecalc">
+            <i class="bi bi-calculator me-1"></i> Recalculer
+          </button>
         </div>
       </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-7">
-          <h3 class="h6">Périodes</h3>
-          <div class="table-responsive">
-            <table class="table table-sm align-middle" id="tblPeriodes">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Début</th>
-                  <th>Fin</th>
-                  <th class="text-end">Jours service (calc.)</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div class="muted-hint">
-            Par défaut, les “jours service” = jours ouvrés (lundi–vendredi) entre début/fin, moins vacances.
-            Vous pouvez inclure les week-ends si vous servez (paramètres).
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-5">
-          <h3 class="h6">Vacances (exclusions)</h3>
-          <div class="table-responsive">
-            <table class="table table-sm align-middle" id="tblVacances">
-              <thead>
-                <tr>
-                  <th>Libellé</th>
-                  <th>Début</th>
-                  <th>Fin</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-
-          <div class="alert alert-light border mt-3 mb-0">
-            <div class="smallcap text-secondary mb-1">Conseil d’usage</div>
-            <div class="muted-hint mb-0">
-              Pour une période (ex. T2), saisissez la période civile (01/04 → 15/07) puis ajoutez les vacances (printemps, ponts, etc.). Le calcul des jours s’ajuste automatiquement.
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== Tarifs ===================== -->
-    <section id="tab-tarifs" class="tab-section d-none">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h2 class="h5 mb-1">Tarifs SRH</h2>
-          <div class="muted-hint">Élèves (pré-rempli), commensaux, CFA. Modifiez selon vos arrêtés et grilles.</div>
-        </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-secondary" id="btnResetTarifs"><i class="bi bi-arrow-counterclockwise"></i> Réinitialiser (modèle)</button>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <h3 class="h6">Élèves – prestations / forfaits (4 tranches)</h3>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle" id="tblTarifsEleves">
-          <thead>
-          <tr>
-            <th style="min-width:170px">Régime</th>
-            <th class="text-center">Code</th>
-            <th class="text-end">Nb jours forfait</th>
-            <th class="text-end">Petits dej.</th>
-            <th class="text-end">Déjeuners</th>
-            <th class="text-end">Dîners</th>
-            <th class="text-end">Nuitées</th>
-            <th class="text-end">Tr.1 (€)</th>
-            <th class="text-end">Tr.2 (€)</th>
-            <th class="text-end">Tr.3 (€)</th>
-            <th class="text-end">Tr.4 (€)</th>
-          </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <hr class="my-4">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <h3 class="h6">Commensaux (4 tarifs)</h3>
-          <div class="table-responsive">
-            <table class="table table-sm align-middle" id="tblTarifsCommensaux">
-              <thead>
-                <tr>
-                  <th>Libellé</th>
-                  <th class="text-end">Tarif (€)</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <button class="btn btn-outline-primary btn-sm" id="btnAddCommensal"><i class="bi bi-plus-circle"></i> Ajouter</button>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <h3 class="h6">CFA</h3>
-          <div class="row g-2">
-            <div class="col-12 col-md-6">
-              <label class="form-label">Ticket CFA (€)</label>
-              <input type="number" step="0.01" class="form-control" id="tarifCfaTicket">
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label">Nuitée CFA (€)</label>
-              <input type="number" step="0.01" class="form-control" id="tarifCfaNuitee">
-            </div>
-          </div>
-          <div class="muted-hint mt-2">
-            Interne CFA = 2 tickets + 1 nuitée (donc : 2 × ticket + nuitée).
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== Volumes & recettes ===================== -->
-    <section id="tab-volumes" class="tab-section d-none">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h2 class="h5 mb-1">Volumes prévisionnels & recettes attendues</h2>
-          <div class="muted-hint">Saisissez vos effectifs/volumes par période. L’outil calcule les recettes attendues (prépa TR).</div>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3 align-items-end">
-        <div class="col-12 col-lg-4">
-          <label class="form-label">Période</label>
-          <select class="form-select" id="periodeVolumes"></select>
-        </div>
-        <div class="col-12 col-lg-8">
-          <div class="alert alert-light border mb-0">
-            <div class="d-flex gap-2 align-items-start">
-              <i class="bi bi-receipt mt-1"></i>
-              <div>
-                <div><strong>Recettes attendues</strong> = forfaits + tickets (élèves) + commensaux + CFA + extra.</div>
-                <div class="muted-hint">Les forfaits élèves utilisent la tranche 1–4 (à paramétrer). Les tickets élèves sont représentés par la ligne “TICKET ELEVES”.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <h3 class="h6">Élèves – effectifs prévus (forfaits)</h3>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle" id="tblVolumesEleves">
-          <thead>
-            <tr>
-              <th>Régime</th>
-              <th class="text-end">Tr.1 (nb)</th>
-              <th class="text-end">Tr.2 (nb)</th>
-              <th class="text-end">Tr.3 (nb)</th>
-              <th class="text-end">Tr.4 (nb)</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <h3 class="h6 mt-4">Tickets / commensaux / CFA / extra</h3>
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-center">
-                <div class="fw-semibold">Tickets élèves (prévu)</div>
-                <span class="badge text-bg-light border">par tranche</span>
-              </div>
-              <div class="row g-2 mt-1">
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Tr.1</label>
-                  <input type="number" min="0" class="form-control" id="volTicketT1">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Tr.2</label>
-                  <input type="number" min="0" class="form-control" id="volTicketT2">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Tr.3</label>
-                  <input type="number" min="0" class="form-control" id="volTicketT3">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Tr.4</label>
-                  <input type="number" min="0" class="form-control" id="volTicketT4">
-                </div>
-              </div>
-              <div class="muted-hint mt-2">Le tarif ticket est celui de la ligne “TICKET ELEVES”.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Commensaux (prévu)</div>
-              <div class="table-responsive mt-2">
-                <table class="table table-sm align-middle mb-0" id="tblVolumesCommensaux">
-                  <thead>
-                    <tr>
-                      <th>Tarif</th>
-                      <th class="text-end">Nb repas</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
-              </div>
-              <div class="muted-hint mt-2">Les libellés/tarifs proviennent de l’onglet Tarifs.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">CFA (prévu)</div>
-              <div class="row g-2 mt-1">
-                <div class="col-6">
-                  <label class="form-label">Nb tickets CFA</label>
-                  <input type="number" min="0" class="form-control" id="volCfaTickets">
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Nb internes CFA</label>
-                  <input type="number" min="0" class="form-control" id="volCfaInternes">
-                </div>
-              </div>
-              <div class="muted-hint mt-2">
-                Interne CFA = 2 tickets + 1 nuitée.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Ressources “extra” (prévu)</div>
-              <label class="form-label mt-2">Montant (€)</label>
-              <input type="number" step="0.01" class="form-control" id="volExtra">
-              <div class="muted-hint mt-2">Location SRH, projets pédagogiques, etc.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-4">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="kpi">
-            <div class="label">Total recettes attendues (période)</div>
-            <div class="value" id="kpiRecettesPeriode">—</div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-6">
-          <div class="kpi">
-            <div class="label">Détail TR conseillé</div>
-            <div class="value" id="kpiTR">—</div>
-            <div class="muted-hint">Indication synthétique (à adapter à vos pratiques et pièces justificatives).</div>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ===================== Import CLCA & dépenses ===================== -->
-    <section id="tab-clca" class="tab-section d-none">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h2 class="h5 mb-1">Import CLCA (lignes de commandes d’achats) & dépenses</h2>
-          <div class="muted-hint">Import XLSX puis “mapping” des colonnes. Les agrégats sont calculés par période (date) et par comptes.</div>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <label class="form-label">Fichier CLCA (XLSX)</label>
-          <input type="file" class="form-control" id="fileCLCA" accept=".xlsx,.xls">
-          <div class="muted-hint mt-2">
-            Astuce : vous pouvez importer plusieurs fois (cela remplace le jeu de données CLCA en mémoire).
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="alert alert-light border mb-0">
-            <div class="d-flex gap-2 align-items-start">
-              <i class="bi bi-clipboard-data mt-1"></i>
-              <div>
-                <div><strong>Mapping</strong> : choisissez les colonnes correspondant à la date, au compte, et aux montants (engagé / consommé).</div>
-                <div class="muted-hint">Si votre CLCA ne contient pas “consommé”, vous pouvez mapper sur “Montant facturé” ou “Montant payé”.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <div id="mappingBox" class="d-none">
-        <h3 class="h6">Mapping des colonnes (feuille importée)</h3>
-        <div class="row g-3">
-          <div class="col-12 col-md-3">
-            <label class="form-label">Date (commande / ligne)</label>
-            <select class="form-select" id="mapDate"></select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Compte</label>
-            <select class="form-select" id="mapCompte"></select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Montant engagé</label>
-            <select class="form-select" id="mapEngage"></select>
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label">Montant consommé</label>
-            <select class="form-select" id="mapConsomme"></select>
-          </div>
-        </div>
-
-        <div class="d-flex gap-2 mt-3">
-          <button class="btn btn-primary" id="btnApplyMapping"><i class="bi bi-lightning-charge"></i> Calculer les agrégats</button>
-          <button class="btn btn-outline-secondary" id="btnClearCLCA"><i class="bi bi-trash"></i> Effacer CLCA</button>
-        </div>
-      </div>
-
-      <hr class="my-4">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-4">
-          <label class="form-label">Période (pour l’affichage)</label>
-          <select class="form-select" id="periodeCLCA"></select>
-        </div>
-        <div class="col-12 col-lg-8">
-          <div class="alert alert-info mb-0">
-            <div class="d-flex gap-2 align-items-start">
-              <i class="bi bi-funnel mt-1"></i>
-              <div>
-                <div><strong>Filtrage automatique</strong> : seules les lignes dont la date est dans la période sélectionnée sont prises.</div>
-                <div class="muted-hint">Les comptes “CN” et “Hors CN” sont configurables (onglet Paramètres).</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="kpi">
-            <div class="label">Total engagé (période)</div>
-            <div class="value" id="kpiEngagePeriode">—</div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-6">
-          <div class="kpi">
-            <div class="label">Total consommé (période)</div>
-            <div class="value" id="kpiConsommePeriode">—</div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-4">
-
-      <h3 class="h6">Détail par familles (CN vs Hors CN)</h3>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle" id="tblCLCAAgg">
-          <thead>
-            <tr>
-              <th>Famille</th>
-              <th class="text-end">Engagé (€)</th>
-              <th class="text-end">Consommé (€)</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <details class="mt-3">
-        <summary class="text-secondary">Voir un extrait des lignes importées (debug)</summary>
-        <pre class="mt-2 p-3 bg-light border rounded-3 small mono" id="clcaPreview" style="max-height:280px; overflow:auto;"></pre>
-      </details>
-    </section>
-
-    <!-- ===================== Crédit nourriture ===================== -->
-    <section id="tab-credit" class="tab-section d-none">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h2 class="h5 mb-1">Calcul du crédit nourriture</h2>
-          <div class="muted-hint">
-            Ressources = recettes SRH (tickets/forfaits/CFA/commensaux) + autres recettes + extra.<br>
-            Emplois = reversement CT + dépenses hors CN (VIAB + autres charges SRH) + dépenses CN (bol alimentaire).
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3 align-items-end">
-        <div class="col-12 col-lg-4">
-          <label class="form-label">Période</label>
-          <select class="form-select" id="periodeCredit"></select>
-        </div>
-        <div class="col-12 col-lg-8">
-          <div class="alert alert-light border mb-0">
-            <div class="d-flex gap-2 align-items-start">
-              <i class="bi bi-bank mt-1"></i>
-              <div>
-                <div><strong>Prévisionnel</strong> : basé sur volumes & tarifs (recettes) + prévisions de reversement/charges.</div>
-                <div class="muted-hint">Le <strong>réalisé</strong> utilise les recettes reçues + dépenses CLCA (si importé) + charges réellement engagées/consommées.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Ressources (réalisé)</div>
-
-              <div class="row g-2 mt-2">
-                <div class="col-6">
-                  <label class="form-label">Recettes SRH reçues (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="recettesRecues">
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Autres recettes affectées (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="autresRecettes">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Extra reçu (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="extraRecu">
-                </div>
-              </div>
-
-              <div class="muted-hint mt-2">
-                Exemple “autres recettes” : dégradations, snacking, etc. (selon votre paramétrage budgétaire SRH).
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Emplois (réalisé)</div>
-
-              <div class="row g-2 mt-2">
-                <div class="col-12">
-                  <label class="form-label">Reversement CT réalisé (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="reversementCT">
-                </div>
-              </div>
-
-              <hr class="my-3">
-
-              <div class="fw-semibold">Dépenses hors CN (VIAB + charges SRH)</div>
-              <div class="row g-2 mt-2">
-                <div class="col-6">
-                  <label class="form-label">Eau (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="viabEau">
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Gaz (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="viabGaz">
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Électricité (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="viabElec">
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Chauffage urbain (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="viabChauffUrb">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Autres charges SRH hors CN (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="autresChargesSRH">
-                </div>
-              </div>
-
-              <div class="muted-hint mt-2">
-                Ces charges “hors CN” sont celles qui consomment la marge SRH (hors achats alimentaires).
-              </div>
-
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-4">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-4">
-          <div class="kpi">
-            <div class="label">Crédit nourriture prévisionnel (période)</div>
-            <div class="value" id="kpiCreditPrev">—</div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="kpi">
-            <div class="label">Crédit nourriture réalisé (période)</div>
-            <div class="value" id="kpiCreditReal">—</div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="kpi">
-            <div class="label">Reste à engager (CN)</div>
-            <div class="value" id="kpiResteAEngager">—</div>
-            <div class="muted-hint">= crédit réalisé − (CN consommé + CN engagé non consommé).</div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-4">
-
-      <div class="table-responsive">
-        <table class="table table-sm align-middle">
-          <thead>
-            <tr>
-              <th>Bloc</th>
-              <th class="text-end">Prévisionnel (€)</th>
-              <th class="text-end">Réalisé (€)</th>
-            </tr>
-          </thead>
-          <tbody id="tblCreditDetail"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ===================== Ratios ===================== -->
-    <section id="tab-ratios" class="tab-section d-none">
-      <div>
-        <h2 class="h5 mb-1">Ratios de pilotage</h2>
-        <div class="muted-hint">Comparaison “prévu / reçu” (recettes) et “engagé / consommé” (dépenses obligatoires).</div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-4">
-          <label class="form-label">Période</label>
-          <select class="form-select" id="periodeRatios"></select>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Dépenses obligatoires</div>
-              <div class="muted-hint">Saisissez le montant obligatoire engagé et consommé (contrats/VIAB/forfaits…).</div>
-
-              <div class="row g-2 mt-2">
-                <div class="col-6">
-                  <label class="form-label">Engagées (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="depOblEng">
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Consommées (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="depOblCons">
-                </div>
-              </div>
-
-              <div class="kpi mt-3">
-                <div class="label">Ratio engagé / consommé</div>
-                <div class="value" id="kpiRatioDepObl">—</div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Recettes (tickets / internes / CFA)</div>
-              <div class="muted-hint">Prévu = calcul volumes & tarifs. Reçu = saisie (ou import futur si vous ajoutez un export recettes).</div>
-
-              <div class="row g-2 mt-2">
-                <div class="col-6">
-                  <label class="form-label">Recettes prévues (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="recettesPrevSaisie" disabled>
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Recettes reçues (€)</label>
-                  <input type="number" step="0.01" class="form-control" id="recettesRecuesRatio">
-                </div>
-              </div>
-
-              <div class="kpi mt-3">
-                <div class="label">Ratio prévu / reçu</div>
-                <div class="value" id="kpiRatioRecettes">—</div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ===================== Paramètres ===================== -->
-    <section id="tab-param" class="tab-section d-none">
-      <div>
-        <h2 class="h5 mb-1">Paramètres</h2>
-        <div class="muted-hint">Définissez vos comptes “Crédit nourriture” (CN) et éventuellement des familles hors CN.</div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Comptes CN (bol alimentaire)</div>
-              <label class="form-label mt-2">Liste de comptes (séparés par virgule)</label>
-              <input class="form-control mono" id="comptesCN" placeholder="ex: 6011, 6022, 6068">
-              <div class="muted-hint mt-2">Utilisé pour classer les lignes CLCA en “CN”.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Comptes hors CN (facultatif)</div>
-              <label class="form-label mt-2">Liste de comptes (séparés par virgule)</label>
-              <input class="form-control mono" id="comptesHorsCN" placeholder="ex: 6063, 615, 6061, 613">
-              <div class="muted-hint mt-2">Si vide : “hors CN” = tout ce qui n’est pas CN.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Calcul jours de service</div>
-              <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" id="inclureWeekend">
-                <label class="form-check-label" for="inclureWeekend">Inclure samedi/dimanche</label>
-              </div>
-              <div class="muted-hint mt-2">
-                Si votre SRH sert le week-end (internat), activez.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
-            <div class="card-body">
-              <div class="fw-semibold">Convention : TR conseillé</div>
-              <label class="form-label mt-2">Texte indicatif (optionnel)</label>
-              <textarea class="form-control" id="trConvention" rows="3"
-                placeholder="ex: TR mensuel : tickets+forfaits, CFA, commensaux, extra..."></textarea>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-4">
-
-      <div class="alert alert-warning mb-0">
-        <div class="d-flex gap-2 align-items-start">
-          <i class="bi bi-shield-exclamation mt-1"></i>
-          <div>
-            <div><strong>Point d’attention</strong> : l’outil est un tableau de bord. Pour fiabiliser, harmonisez vos exports (colonnes CLCA, dates) et verrouillez vos conventions de comptes CN/hors CN.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </div>
-</div>
-
-<div class="sticky-actions">
-  <div class="container d-flex flex-wrap gap-2 justify-content-between align-items-center">	
-    <div class="muted-hint">
-      <span class="badge badge-soft">Local</span>
-      Données stockées dans votre navigateur (localStorage). Pensez à exporter JSON pour archivage.
-    </div>
-
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary btn-sm" id="btnRecalc"><i class="bi bi-arrow-repeat"></i> Recalculer</button>
-      <button class="btn btn-primary btn-sm" id="btnSave2"><i class="bi bi-check2-circle"></i> Sauvegarder</button>
     </div>
   </div>
-  <div class="container d-flex flex-wrap gap-2 justify-content-between align-items-center">	<div class="muted-hint">
-    <span id="app-version"> Version</span>
-  </div></div>
-</div>
 
+  <main class="container my-4">
 
+    <!-- Alerts -->
+    <div id="alertBox"></div>
 
+    <!-- KPI Row -->
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-3">
+        <div class="kpi">
+          <div class="small text-muted">Recettes réalisées</div>
+          <div class="h4 mb-0" id="kpiRecReal">—</div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-3">
+        <div class="kpi">
+          <div class="small text-muted">Dépenses réalisées</div>
+          <div class="h4 mb-0" id="kpiDepReal">—</div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-3">
+        <div class="kpi">
+          <div class="small text-muted">Crédit nourriture à date</div>
+          <div class="h4 mb-0" id="kpiCNReal">—</div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-3">
+        <div class="kpi">
+          <div class="small text-muted">Crédit nourriture fin de période</div>
+          <div class="h4 mb-0" id="kpiCNPrev">—</div>
+          <div class="form-text" id="kpiTRHint">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top accordion (escamotable) -->
+    <div class="accordion mb-3" id="accTop">
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hTop">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cTop" aria-expanded="true">
+            <i class="bi bi-sliders me-2"></i> Paramètres, périodes, imports OP@LE et règles (escamotable)
+          </button>
+        </h2>
+        <div id="cTop" class="accordion-collapse collapse show" data-bs-parent="#accTop">
+          <div class="accordion-body">
+            <div class="row g-3">
+
+              <!-- Période -->
+              <div class="col-12 col-lg-4">
+                <div class="card h-100">
+                  <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Période</div>
+                  <div class="card-body">
+                    <div class="row g-2">
+                      <div class="col-6">
+                        <label class="form-label">Début</label>
+                        <input type="date" class="form-control" id="periodStart">
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label">Fin</label>
+                        <input type="date" class="form-control" id="periodEnd">
+                      </div>
+                    </div>
+                    <div class="mt-3">
+                      <label class="form-label">Vacances / interruptions</label>
+                      <textarea class="form-control" id="periodBreaks" rows="3"
+                        placeholder="Ex. Toussaint : 2026-10-17 → 2026-11-02&#10;Noël : 2026-12-19 → 2027-01-04"></textarea>
+                      <div class="form-text">Les jours en vacances sont exclus des courbes et filtres période.</div>
+                    </div>
+
+                    <hr class="my-3">
+                    <label class="form-label">Sensibilité alerte</label>
+                    <div class="row g-2">
+                      <div class="col-6">
+                        <label class="form-label small text-muted mb-1">Seuil base (% dépenses prév.)</label>
+                        <input type="number" class="form-control" id="baseThresholdPct" step="0.1" value="5.0">
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label small text-muted mb-1">Facteur Sep–Déc</label>
+                        <input type="number" class="form-control" id="sepDecFactor" step="0.1" value="1.5">
+                      </div>
+                    </div>
+                    <div class="form-text">
+                      Alerte = mix valeur (X% des dépenses prévisionnelles) + sensibilité renforcée Sep–Déc.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Imports -->
+              <div class="col-12 col-lg-8">
+                <div class="card h-100">
+                  <div class="card-header"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Imports OP@LE (CLCA + Budget SRH)</div>
+                  <div class="card-body">
+                    <div class="row g-3">
+                      <div class="col-12 col-lg-6">
+                        <label class="form-label">Import CLCA (XLSX)</label>
+                        <input type="file" class="form-control" id="clcaFile" accept=".xlsx,.xls,.csv">
+                        <div class="form-text">Utilisé surtout pour les dépenses (engagé / consommé) + libellés/fournisseurs.</div>
+                      </div>
+                      <div class="col-12 col-lg-6">
+                        <label class="form-label">Import restitution budget SRH (XLSX/CSV)</label>
+                        <input type="file" class="form-control" id="budgetFile" accept=".xlsx,.xls,.csv">
+                        <div class="form-text">Utilisé pour consolidé réalisé/prévision (consommé, engagé, budget/PR, etc.).</div>
+                      </div>
+
+                      <div class="col-12">
+                        <div class="alert alert-light border mb-0">
+                          <div class="fw-semibold mb-1"><i class="bi bi-wrench-adjustable me-1"></i>Mapping des colonnes)</div>
+                          <div class="small text-muted">
+                            Après import, choisissez les colonnes utiles. L’outil retient vos choix dans le fichier de suivi.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="col-12 col-lg-6">
+                        <div class="border rounded-3 p-3 bg-light">
+                          <div class="fw-semibold mb-2">Mapping CLCA</div>
+                          <div class="row g-2">
+                            <div class="col-6">
+                              <label class="form-label">Date</label>
+                              <select class="form-select" id="mapClcaDate"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label">Montant</label>
+                              <select class="form-select" id="mapClcaAmount"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label">Libellé / Objet</label>
+                              <select class="form-select" id="mapClcaLabel"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label">Statut (engagé/payé)</label>
+                              <select class="form-select" id="mapClcaStatus"></select>
+                            </div>
+                            <div class="col-12">
+                              <label class="form-label">Fournisseur/Tiers (option)</label>
+                              <select class="form-select" id="mapClcaVendor"></select>
+                            </div>
+                          </div>
+                          <div class="form-text mt-2">
+                            Si “statut” est vide : l’outil classe en “réalisé” par défaut.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="col-12 col-lg-6">
+                        <div class="border rounded-3 p-3 bg-light">
+                          <div class="fw-semibold mb-2">Mapping Budget SRH</div>
+                          <div class="row g-2">
+                            <div class="col-6">
+                              <label class="form-label">Nature/Compte (option)</label>
+                              <select class="form-select" id="mapBudKey"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label">Libellé (option)</label>
+                              <select class="form-select" id="mapBudLabel"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label">Réalisé (consommé/mandaté)</label>
+                              <select class="form-select" id="mapBudReal"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label">Prévision (budget / PR / engagé)</label>
+                              <select class="form-select" id="mapBudPrev"></select>
+                            </div>
+                            <div class="col-12">
+                              <label class="form-label">Type (Recette/Dépense) (option)</label>
+                              <select class="form-select" id="mapBudType"></select>
+                            </div>
+                          </div>
+                          <div class="form-text mt-2">
+                            Si “type” est absent : les règles de mots-clés feront le classement.
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Règles -->
+              <div class="col-12">
+                <div class="card">
+                  <div class="card-header"><i class="bi bi-funnel me-2"></i>Règles de classement (plastiques)</div>
+                  <div class="card-body">
+                    <div class="row g-3">
+                      <div class="col-12 col-lg-6">
+                        <label class="form-label">Règles RECETTES (mots-clés)</label>
+                        <textarea class="form-control" id="rulesRevenue" rows="3"
+                          placeholder="tickets, interne, commensaux, extérieur, location, hébergement, réception, annexe"></textarea>
+                        <div class="form-text">Séparez par virgule / point-virgule / retour ligne.</div>
+                      </div>
+                      <div class="col-12 col-lg-6">
+                        <label class="form-label">Règles DÉPENSES obligatoires & VIAB (mots-clés)</label>
+                        <textarea class="form-control" id="rulesSpend" rows="3"
+                          placeholder="eau, gaz, électricité, chauffage urbain, contrôle sanitaire, maintenance, révision, vérification, sécurité"></textarea>
+                        <div class="form-text">L’outil tentera VIAB via mots-clés eau/gaz/électricité/chauffage urbain.</div>
+                      </div>
+                      <div class="col-12">
+                        <div class="d-flex flex-wrap gap-2">
+                          <button class="btn btn-outline-secondary" id="btnClearImports">
+                            <i class="bi bi-eraser me-1"></i> Effacer imports
+                          </button>
+                          <button class="btn btn-outline-primary" id="btnSaveLocal">
+                            <i class="bi bi-floppy me-1"></i> Enregistrer en local (navigateur)
+                          </button>
+                          <button class="btn btn-outline-secondary" id="btnLoadLocal">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Recharger depuis local
+                          </button>
+                        </div>
+                        <div class="form-text mt-2">
+                          “Local” = stockage navigateur (pratique au quotidien). “Télécharger le suivi” = fichier portable (JSON).
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- row -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tables: Rubriques -->
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-cash-coin me-2"></i>Recettes (réalisé / prévision)</div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered align-middle mb-0" id="tblRecettes">
+                <thead>
+                  <tr>
+                    <th>Rubrique</th>
+                    <th class="text-end">Réalisé</th>
+                    <th class="text-end">Prévision</th>
+                    <th>Note</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+                <tfoot>
+                  <tr class="table-light fw-semibold">
+                    <td>Total recettes</td>
+                    <td class="text-end" id="totRecReal">—</td>
+                    <td class="text-end" id="totRecPrev">—</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div class="form-text mt-2">Vous pouvez saisir manuellement une ligne : double-cliquez une cellule Réalisé/Prévision.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-receipt-cutoff me-2"></i>Dépenses (VIAB + obligatoires + option denrées)</div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered align-middle mb-0" id="tblDepenses">
+                <thead>
+                  <tr>
+                    <th>Rubrique</th>
+                    <th class="text-end">Réalisé</th>
+                    <th class="text-end">Prévision</th>
+                    <th>Note</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+                <tfoot>
+                  <tr class="table-light fw-semibold">
+                    <td>Total dépenses</td>
+                    <td class="text-end" id="totDepReal">—</td>
+                    <td class="text-end" id="totDepPrev">—</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div class="form-text mt-2">
+              VIAB détaillée : eau, gaz, électricité, chauffage urbain (auto via mots-clés, ajustable).
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graph -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-graph-up me-2"></i>Graphique – Réel vs Prévisionnel</div>
+      <div class="card-body">
+        <canvas id="chartCN" height="90"></canvas>
+        <div class="form-text mt-2">
+          Courbe = crédit nourriture cumulé sur la période (jours hors vacances). Barres = projection fin de période.
+        </div>
+      </div>
+    </div>
+
+    <!-- Transactions -->
+    <div class="card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div><i class="bi bi-list-check me-2"></i>Lignes importées (CLCA + Budget) – aperçu & correction</div>
+        <span class="badge text-bg-light border" id="txCount">0 ligne</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-2">
+          <div class="col-12 col-lg-4">
+            <input class="form-control" id="txSearch" placeholder="Filtrer (libellé / fournisseur / rubrique)…">
+          </div>
+          <div class="col-12 col-lg-3">
+            <select class="form-select" id="txFilterType">
+              <option value="">Tous types</option>
+              <option value="RECETTE">Recettes</option>
+              <option value="DEPENSE">Dépenses</option>
+            </select>
+          </div>
+          <div class="col-12 col-lg-3">
+            <select class="form-select" id="txFilterScope">
+              <option value="PERIOD" selected>Dans la période</option>
+              <option value="ALL">Tout (sans filtre dates)</option>
+            </select>
+          </div>
+          <div class="col-12 col-lg-2 d-grid">
+            <button class="btn btn-outline-secondary" id="btnReclass">
+              <i class="bi bi-magic me-1"></i> Reclasser
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Rubrique</th>
+                <th>Libellé</th>
+                <th>Fournisseur</th>
+                <th class="text-end">Montant</th>
+                <th>Statut</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="txBody">
+              <tr><td colspan="9" class="text-muted">Aucune donnée importée.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="form-text mt-2">
+          Correction rapide : cliquez sur “Rubrique” d’une ligne pour la modifier.
+        </div>
+      </div>
+    </div>
+
+    <div class="sticky-actions py-3">
+      <div class="container d-flex flex-wrap gap-2 justify-content-end">
+        <button class="btn btn-outline-secondary" id="btnReset">
+          <i class="bi bi-trash3 me-1"></i> Réinitialiser
+        </button>
+        <button class="btn btn-outline-primary" id="btnExportCsv">
+          <i class="bi bi-filetype-csv me-1"></i> Export CSV (lignes)
+        </button>
+        <button class="btn btn-primary" id="btnRecalc2">
+          <i class="bi bi-check2-circle me-1"></i> Calculer
+        </button>
+      </div>
+    </div>
+
+    <footer class="py-4">
+      <div class="text-center small text-muted">
+        <small id="app-version"></small>
+      </div>
+    </footer>
+  </main>
 <script>
 /**
- * Outil Op@le - suivi du crédit nourriture
- * Basé sur exports Op@le : CLCA
+ * SRH Op@le - Crédit nourriture
+ * Basé sur exports Op@le : CLCA, resitution
  *
  * @version 0.0.1
  * @author Yann Bogdanovic
  * @description
- *  - Outil OP@LE suivi du crédit nourriture
+ *  - Outil OP@LE pour calcul et suivi du crédit nourriture
  */
-	const APP_VERSION = "CIMR OP@LE - 0.0.1";
-	window.addEventListener("DOMContentLoaded", () => {
-		const el = document.getElementById("app-version");
-		if (el) el.textContent = APP_VERSION;
-	});
-	
+const APP_VERSION = "SRH OP@LE - 0.0.1";
+window.addEventListener("DOMContentLoaded", () => {
+    const el = document.getElementById("app-version");
+    if (el) el.textContent = APP_VERSION;
+});
+const FR = {
+  parseMoney(v){
+    if (v == null) return 0;
+    if (typeof v === "number") return isFinite(v) ? v : 0;
+    let s = String(v).trim();
+    if (!s) return 0;
+    s = s.replace(/\u00A0|\u202F/g, " ").replace(/[€]/g, "").trim();
+    const sign = s.startsWith("-") ? -1 : 1;
+    s = s.replace(/^[-+]/, "").trim().replace(/ /g, "").replace(",", ".");
+    const n = Number(s);
+    return isFinite(n) ? sign * n : 0;
+  },
+  fmtMoney(n){
+    const v = Number(n);
+    if (!isFinite(v)) return "—";
+    return v.toLocaleString("fr-FR", { style:"currency", currency:"EUR" });
+  },
+  fmtDate(d){
+    if (!d) return "";
+    try { return d.toLocaleDateString("fr-FR"); } catch { return ""; }
+  }
+};
+
+function $(id){ return document.getElementById(id); }
+
+function todayISO(){
+  const d = new Date();
+  const pad = (x)=>String(x).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function parseISODate(v){
+  if (!v) return null;
+  if (v instanceof Date && !isNaN(v)) return v;
+  if (typeof v === "number"){
+    // Excel serial (fallback)
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    const d = new Date(epoch.getTime() + v*86400000);
+    return isNaN(d) ? null : d;
+  }
+  const s = String(v).trim();
+  if (!s) return null;
+  // try native
+  const d1 = new Date(s);
+  if (!isNaN(d1)) return d1;
+  // dd/mm/yyyy
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m){
+    const d2 = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+    return isNaN(d2) ? null : d2;
+  }
+  return null;
+}
+
+function parseBreaks(text){
+  const out = [];
+  if (!text) return out;
+  const lines = String(text).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  for (const line of lines){
+    const m = line.match(/(\d{4}-\d{2}-\d{2}).*(→|->|—|–|-).*(\d{4}-\d{2}-\d{2})/);
+    if (m){
+      const a = parseISODate(m[1]);
+      const b = parseISODate(m[3]);
+      if (a && b){
+        out.push({ start: a < b ? a : b, end: a < b ? b : a, label: line });
+      }
+    }
+  }
+  return out;
+}
+
+function isInBreaks(date, breaks){
+  if (!date) return false;
+  const t = date.getTime();
+  for (const br of breaks){
+    if (t >= br.start.getTime() && t <= br.end.getTime()) return true;
+  }
+  return false;
+}
+
+function inRange(d, start, end){
+  if (!d || !start || !end) return true;
+  const t = d.getTime();
+  return t >= start.getTime() && t <= end.getTime();
+}
+
+function splitKeywords(text){
+  return (text || "")
+    .split(/[,;\n\r]+/g)
+    .map(s=>s.trim())
+    .filter(Boolean);
+}
+
+function regexesFrom(text){
+  return splitKeywords(text).map(k=>{
+    const esc = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(esc, "i");
+  });
+}
+
+function matchesAny(hay, regs){
+  if (!regs || !regs.length) return false;
+  const s = String(hay || "");
+  return regs.some(r=>r.test(s));
+}
+
+function guessStatusKind(statusText){
+  const s = String(statusText || "").toLowerCase();
+  if (!s) return "unknown";
+  if (/(mandat|pay|pai|liquid|consomm|régl|regl|factur|service fait|sf)/i.test(s)) return "consumed";
+  if (/(engag|commande|bc|reservation|réserv|reserv)/i.test(s)) return "engaged";
+  return "unknown";
+}
+
+function escapeHtml(s){
+  return String(s ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+/* ==============================
+  STATE (exportable)
+============================== */
+const state = {
+  meta: { orgName:"", schoolYear:"" },
+  period: { start:null, end:null, breaksText:"" },
+  alerting: { baseThresholdPct: 5.0, sepDecFactor: 1.5 },
+  rules: {
+    // Ces règles sont volontairement simples. Vous pouvez les enrichir.
+    revenue: "tickets, interne, commensaux, extérieur, exterieur, location, hébergement, hebergement, réception, reception, annexe, produit annexe, vente",
+    spend: "eau, gaz, électricité, electricite, chauffage urbain, contrôle sanitaire, controle sanitaire, maintenance, révision, revision, vérification, verification, sécurité, securite"
+  },
+  mappings: {
+    clca: { date:"", amount:"", label:"", status:"", vendor:"" },
+    budget: { key:"", label:"", real:"", prev:"", type:"" }
+  },
+  categories: {
+    recettes: [
+      { id:"REC_TICKETS",   name:"Tickets", note:"" },
+      { id:"REC_INTERNES",  name:"Internes", note:"" },
+      { id:"REC_COMMENSAUX",name:"Commensaux", note:"" },
+      { id:"REC_EXTERIEURS",name:"Extérieurs", note:"" },
+      { id:"REC_LOCATION",  name:"Location restauration/hébergement", note:"" },
+      { id:"REC_RECEPTIONS",name:"Réceptions", note:"" },
+      { id:"REC_ANNEXES",   name:"Produits annexes", note:"" }
+    ],
+    depenses: [
+      { id:"DEP_VIAB_EAU",  name:"VIAB – Eau", note:"" },
+      { id:"DEP_VIAB_GAZ",  name:"VIAB – Gaz", note:"" },
+      { id:"DEP_VIAB_ELEC", name:"VIAB – Électricité", note:"" },
+      { id:"DEP_VIAB_CHAUD",name:"VIAB – Chauffage urbain", note:"" },
+      { id:"DEP_OBLIG",     name:"Charges obligatoires", note:"(contrôles, maintenance, révisions…)" },
+      { id:"DEP_DENREES",   name:"Denrées (option)", note:"À activer / ajuster selon votre pilotage" }
+    ]
+  },
+  transactions: [
+    // {id, date, type:"RECETTE|DEPENSE", categoryId, label, vendor, amount, statusKind, statusRaw, source}
+  ],
+  manual: {
+    // categoryId: { real: number, prev: number }
+  }
+};
+
+/* ==============================
+  UI init
+  (Nécessite des éléments présents dans votre HTML V2)
+  - Inputs: periodStart, periodEnd, periodBreaks, baseThresholdPct, sepDecFactor
+  - Textareas: rulesRevenue, rulesSpend
+  - Tables: tblRecettes, tblDepenses, tblTx
+  - Mapping selects: mapClcaDate/mapClcaAmount/mapClcaLabel/mapClcaStatus/mapClcaVendor
+                   mapBudKey/mapBudLabel/mapBudReal/mapBudPrev/mapBudType
+  - KPI placeholders: kpiSpendActual,kpiRevActual,kpiSpendForecast,kpiRevForecast,kpiCreditFood,creditFoodBox
+  - Alert placeholder: alertBox
+  - Chart canvas: cnChart
+============================== */
+function initDefaults(){
+  if (!state.period.start) state.period.start = todayISO();
+  if (!state.period.end) state.period.end = todayISO();
+
+  if ($("periodStart")) $("periodStart").value = state.period.start;
+  if ($("periodEnd")) $("periodEnd").value = state.period.end;
+  if ($("periodBreaks")) $("periodBreaks").value = state.period.breaksText || "";
+
+  if ($("baseThresholdPct")) $("baseThresholdPct").value = state.alerting.baseThresholdPct;
+  if ($("sepDecFactor")) $("sepDecFactor").value = state.alerting.sepDecFactor;
+
+  if ($("rulesRevenue")) $("rulesRevenue").value = state.rules.revenue;
+  if ($("rulesSpend")) $("rulesSpend").value = state.rules.spend;
+}
+
+/* ==============================
+  Build tables with editable cells
+============================== */
+function ensureManual(catId){
+  if (!state.manual[catId]) state.manual[catId] = { real: 0, prev: 0 };
+  return state.manual[catId];
+}
+
+function buildCategoryTables(){
+  const recT = $("tblRecettes");
+  const depT = $("tblDepenses");
+  if (!recT || !depT) return;
+
+  const recBody = recT.querySelector("tbody");
+  const depBody = depT.querySelector("tbody");
+  recBody.innerHTML = "";
+  depBody.innerHTML = "";
+
+  function addRow(tbody, cat, type){
+    const tr = document.createElement("tr");
+    tr.dataset.catId = cat.id;
+    tr.dataset.type = type;
+    const man = ensureManual(cat.id);
+
+    tr.innerHTML = `
+      <td>${escapeHtml(cat.name)}</td>
+      <td class="text-end editable" data-field="real" title="Double-clic pour modifier">${FR.fmtMoney(man.real)}</td>
+      <td class="text-end editable" data-field="prev" title="Double-clic pour modifier">${FR.fmtMoney(man.prev)}</td>
+      <td><input class="form-control form-control-sm" value="${escapeHtml(cat.note||"")}" data-field="note"></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  state.categories.recettes.forEach(cat=>addRow(recBody, cat, "RECETTE"));
+  state.categories.depenses.forEach(cat=>addRow(depBody, cat, "DEPENSE"));
+
+  // editable money cells
+  document.querySelectorAll("td.editable").forEach(td=>{
+    td.addEventListener("dblclick", ()=>{
+      const tr = td.closest("tr");
+      const catId = tr.dataset.catId;
+      const field = td.dataset.field;
+      const current = ensureManual(catId)[field] || 0;
+
+      const input = document.createElement("input");
+      input.className = "form-control form-control-sm text-end";
+      input.value = String(current).replace(".", ",");
+      td.innerHTML = "";
+      td.appendChild(input);
+      input.focus();
+      input.select();
+
+      const commit = ()=>{
+        const v = FR.parseMoney(input.value);
+        ensureManual(catId)[field] = v;
+        td.innerHTML = FR.fmtMoney(v);
+        recalcAll();
+        saveLocalMaybe();
+      };
+
+      input.addEventListener("blur", commit);
+      input.addEventListener("keydown", (e)=>{
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape"){
+          td.innerHTML = FR.fmtMoney(current);
+        }
+      });
+    });
+  });
+
+  // note inputs
+  document.querySelectorAll("input[data-field='note']").forEach(inp=>{
+    inp.addEventListener("change", ()=>{
+      const tr = inp.closest("tr");
+      const catId = tr.dataset.catId;
+      const type = tr.dataset.type;
+      const list = type === "RECETTE" ? state.categories.recettes : state.categories.depenses;
+      const cat = list.find(x=>x.id===catId);
+      if (cat) cat.note = inp.value;
+      saveLocalMaybe();
+    });
+  });
+}
+
+/* ==============================
+  Import utilities (XLSX/CSV)
+============================== */
+function readWorkbookFromFile(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (e)=>{
+      try{
+        const dataArr = e.target.result;
+        const wb = XLSX.read(dataArr, { type:"array" });
+        resolve(wb);
+      }catch(err){ reject(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function sheetToRows(wb, sheetName){
+  const name = sheetName || wb.SheetNames[0];
+  const ws = wb.Sheets[name];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval:"" });
+  return { rows, sheetName:name };
+}
+
+function fillMappingSelect(selectId, headers, preferred){
+  const sel = $(selectId);
+  if (!sel) return;
+  sel.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "—";
+  sel.appendChild(opt0);
+  for (const h of headers){
+    const opt = document.createElement("option");
+    opt.value = h;
+    opt.textContent = h;
+    sel.appendChild(opt);
+  }
+  if (preferred && headers.includes(preferred)) sel.value = preferred;
+}
+
+function detectPreferred(headers, patterns){
+  const lower = headers.map(h=>String(h).toLowerCase());
+  for (let i=0;i<lower.length;i++){
+    for (const re of patterns){
+      if (re.test(lower[i])) return headers[i];
+    }
+  }
+  return "";
+}
+
+function setupClcaMapping(headers){
+  const prefDate = state.mappings.clca.date || detectPreferred(headers,[/date/]);
+  const prefAmount = state.mappings.clca.amount || detectPreferred(headers,[/montant/,/ttc/,/ht/,/total/,/net/]);
+  const prefLabel = state.mappings.clca.label || detectPreferred(headers,[/objet/,/libell/,/désignation|designation/,/intitul/]);
+  const prefStatus = state.mappings.clca.status || detectPreferred(headers,[/statut/,/etat/,/phase/,/engag/,/mandat/,/pai/]);
+  const prefVendor = state.mappings.clca.vendor || detectPreferred(headers,[/tiers/,/fournisseur/,/créancier|creancier/,/beneficiaire/,/raison/]);
+
+  fillMappingSelect("mapClcaDate", headers, prefDate);
+  fillMappingSelect("mapClcaAmount", headers, prefAmount);
+  fillMappingSelect("mapClcaLabel", headers, prefLabel);
+  fillMappingSelect("mapClcaStatus", headers, prefStatus);
+  fillMappingSelect("mapClcaVendor", headers, prefVendor);
+}
+
+function setupBudgetMapping(headers){
+  const prefKey = state.mappings.budget.key || detectPreferred(headers,[/compte/,/nature/,/code/]);
+  const prefLabel = state.mappings.budget.label || detectPreferred(headers,[/libell/,/intitul/,/designation/]);
+  const prefReal = state.mappings.budget.real || detectPreferred(headers,[/consomm/,/mandat/,/réalis|realis/,/execu/]);
+  const prefPrev = state.mappings.budget.prev || detectPreferred(headers,[/budget/,/prévision|prevision/,/\bpr\b/,/engag/,/dotation/,/ouvert/]);
+  const prefType = state.mappings.budget.type || detectPreferred(headers,[/type/,/sens/,/recett/,/dépens|depens/,/charge/]);
+
+  fillMappingSelect("mapBudKey", headers, prefKey);
+  fillMappingSelect("mapBudLabel", headers, prefLabel);
+  fillMappingSelect("mapBudReal", headers, prefReal);
+  fillMappingSelect("mapBudPrev", headers, prefPrev);
+  fillMappingSelect("mapBudType", headers, prefType);
+}
+
+/* ==============================
+  Classification (plastique)
+============================== */
+function classifyTransaction(tx){
+  const revRegs = regexesFrom(state.rules.revenue);
+  const spRegs  = regexesFrom(state.rules.spend);
+
+  const hay = `${tx.label||""} ${tx.vendor||""} ${tx.statusRaw||""}`.trim();
+
+  // Type
+  let type = tx.type;
+  if (!type){
+    if (matchesAny(hay, revRegs)) type = "RECETTE";
+    else type = "DEPENSE";
+  }
+
+  // Category
+  let categoryId = tx.categoryId;
+
+  if (type === "DEPENSE"){
+    const h = hay.toLowerCase();
+    if (!categoryId){
+      if (/eau/.test(h)) categoryId = "DEP_VIAB_EAU";
+      else if (/gaz/.test(h)) categoryId = "DEP_VIAB_GAZ";
+      else if (/(électric|electric|edf|kwh)/.test(h)) categoryId = "DEP_VIAB_ELEC";
+      else if (/(chauffage urbain|réseau de chaleur|reseau de chaleur)/.test(h)) categoryId = "DEP_VIAB_CHAUD";
+      else if (matchesAny(hay, spRegs)) categoryId = "DEP_OBLIG";
+      else categoryId = "DEP_DENREES"; // fallback
+    }
+  } else {
+    if (!categoryId){
+      const h = hay.toLowerCase();
+      if (/interne/.test(h)) categoryId = "REC_INTERNES";
+      else if (/commens/.test(h)) categoryId = "REC_COMMENSAUX";
+      else if (/(extérieur|exterieur)/.test(h)) categoryId = "REC_EXTERIEURS";
+      else if (/(location|héberg|heberg)/.test(h)) categoryId = "REC_LOCATION";
+      else if (/(réception|reception)/.test(h)) categoryId = "REC_RECEPTIONS";
+      else if (/(annexe|divers|vente)/.test(h)) categoryId = "REC_ANNEXES";
+      else categoryId = "REC_TICKETS";
+    }
+  }
+
+  return { ...tx, type, categoryId };
+}
+
+function reclassAll(){
+  // refresh rules from UI
+  if ($("rulesRevenue")) state.rules.revenue = $("rulesRevenue").value || state.rules.revenue;
+  if ($("rulesSpend")) state.rules.spend = $("rulesSpend").value || state.rules.spend;
+
+  state.transactions = state.transactions.map(tx=>classifyTransaction(tx));
+  renderTransactions();
+  recalcAll();
+  saveLocalMaybe();
+}
+
+/* ==============================
+  Apply imports -> transactions
+============================== */
+function upsertTransaction(tx){
+  state.transactions.push(tx);
+}
+
+function applyClcaRows(rows){
+  state.mappings.clca = {
+    date: $("mapClcaDate")?.value || "",
+    amount: $("mapClcaAmount")?.value || "",
+    label: $("mapClcaLabel")?.value || "",
+    status: $("mapClcaStatus")?.value || "",
+    vendor: $("mapClcaVendor")?.value || ""
+  };
+  const md = state.mappings.clca;
+
+  for (const r of rows){
+    const date = md.date ? parseISODate(r[md.date]) : null;
+    const amount = md.amount ? FR.parseMoney(r[md.amount]) : 0;
+    const label = md.label ? String(r[md.label]||"") : "";
+    const vendor = md.vendor ? String(r[md.vendor]||"") : "";
+    const statusRaw = md.status ? String(r[md.status]||"") : "";
+    const statusKind = md.status ? guessStatusKind(statusRaw) : "unknown";
+
+    if (!amount && !label && !vendor) continue;
+
+    const tx = classifyTransaction({
+      id: `CLCA_${state.transactions.length+1}`,
+      date,
+      type: null,          // let classifier decide
+      categoryId: null,
+      label,
+      vendor,
+      amount: Math.abs(Number(amount||0)),
+      statusKind,
+      statusRaw,
+      source: "CLCA"
+    });
+
+    upsertTransaction(tx);
+  }
+}
+
+function applyBudgetRows(rows){
+  state.mappings.budget = {
+    key: $("mapBudKey")?.value || "",
+    label: $("mapBudLabel")?.value || "",
+    real: $("mapBudReal")?.value || "",
+    prev: $("mapBudPrev")?.value || "",
+    type: $("mapBudType")?.value || ""
+  };
+  const mb = state.mappings.budget;
+
+  for (const r of rows){
+    const key = mb.key ? String(r[mb.key]||"") : "";
+    const label = mb.label ? String(r[mb.label]||"") : (key || "");
+    const real = mb.real ? FR.parseMoney(r[mb.real]) : 0;
+    const prev = mb.prev ? FR.parseMoney(r[mb.prev]) : 0;
+    const typeRaw = mb.type ? String(r[mb.type]||"") : "";
+
+    if (!label && !key && !real && !prev) continue;
+
+    let type = null;
+    if (typeRaw){
+      const t = typeRaw.toLowerCase();
+      if (t.includes("rec")) type = "RECETTE";
+      if (t.includes("dep") || t.includes("dép") || t.includes("charge")) type = "DEPENSE";
+    }
+
+    if (real){
+      const txReal = classifyTransaction({
+        id: `BUD_REAL_${state.transactions.length+1}`,
+        date: null,
+        type,
+        categoryId: null,
+        label: `[Budget] ${label}`,
+        vendor: "",
+        amount: Math.abs(real),
+        statusKind: "consumed",
+        statusRaw: "budget_real",
+        source: "BUDGET"
+      });
+      upsertTransaction(txReal);
+    }
+
+    if (prev){
+      const txPrev = classifyTransaction({
+        id: `BUD_PREV_${state.transactions.length+1}`,
+        date: null,
+        type,
+        categoryId: null,
+        label: `[Budget prévision] ${label}`,
+        vendor: "",
+        amount: Math.abs(prev),
+        statusKind: "engaged",
+        statusRaw: "budget_prev",
+        source: "BUDGET"
+      });
+      upsertTransaction(txPrev);
+    }
+  }
+}
+
+/* ==============================
+  Transactions table (preview + correction)
+============================== */
+function renderTransactions(){
+  const tbl = $("tblTx");
+  if (!tbl) return;
+  const body = tbl.querySelector("tbody");
+  body.innerHTML = "";
+
+  const start = parseISODate($("periodStart")?.value);
+  const end   = parseISODate($("periodEnd")?.value);
+  const breaks = parseBreaks($("periodBreaks")?.value || "");
+
+  const recCats = state.categories.recettes;
+  const depCats = state.categories.depenses;
+
+  const catOptions = (type) => {
+    const list = type === "RECETTE" ? recCats : depCats;
+    return list.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  };
+
+  const visible = state.transactions
+    .filter(tx=>{
+      // filter by period when date exists
+      if (!tx.date) return true;
+      if (!inRange(tx.date, start, end)) return false;
+      if (isInBreaks(tx.date, breaks)) return false;
+      return true;
+    })
+    .slice(0, 200); // preview limit
+
+  if (!visible.length){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="8" class="text-muted">Aucune transaction affichée.</td>`;
+    body.appendChild(tr);
+    return;
+  }
+
+  for (const tx of visible){
+    const tr = document.createElement("tr");
+    tr.dataset.txId = tx.id;
+
+    const typeBadge = tx.type === "RECETTE"
+      ? `<span class="badge text-bg-success">Recette</span>`
+      : `<span class="badge text-bg-secondary">Dépense</span>`;
+
+    const stBadge = tx.statusKind === "consumed"
+      ? `<span class="badge text-bg-primary">Consommé</span>`
+      : tx.statusKind === "engaged"
+        ? `<span class="badge text-bg-warning">Engagé</span>`
+        : `<span class="badge text-bg-light text-dark border">—</span>`;
+
+    tr.innerHTML = `
+      <td class="mono">${escapeHtml(tx.source||"")}</td>
+      <td>${FR.fmtDate(tx.date)}</td>
+      <td>${typeBadge}</td>
+      <td>${escapeHtml(tx.vendor||"")}</td>
+      <td>${escapeHtml(tx.label||"")}</td>
+      <td class="text-end">${FR.fmtMoney(tx.amount||0)}</td>
+      <td>${stBadge}</td>
+      <td>
+        <select class="form-select form-select-sm" data-field="category">
+          ${catOptions(tx.type)}
+        </select>
+      </td>
+    `;
+
+    body.appendChild(tr);
+
+    const sel = tr.querySelector("select[data-field='category']");
+    sel.value = tx.categoryId || (tx.type==="RECETTE" ? "REC_TICKETS" : "DEP_DENREES");
+    sel.addEventListener("change", ()=>{
+      const cur = state.transactions.find(t=>t.id===tx.id);
+      if (cur){
+        cur.categoryId = sel.value;
+        // when user overrides category, keep it
+        recalcAll();
+        saveLocalMaybe();
+      }
+    });
+  }
+
+  if (state.transactions.length > visible.length){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="8" class="text-muted">Aperçu limité à ${visible.length} lignes (sur ${state.transactions.length}).</td>`;
+    body.appendChild(tr);
+  }
+}
+
+/* ==============================
+  Aggregation (real vs prev)
+  - Réalisé : statusKind == consumed (et budget_real)
+  - Prévision : réalisé + engagé (ou budget_prev)
+  - On additionne aussi les "manual" par catégorie (real & prev)
+============================== */
+function sumsByCategory(){
+  const sums = {}; // catId -> { real, prev }
+  const ensure = (catId)=>{
+    if (!sums[catId]) sums[catId] = { real: 0, prev: 0 };
+    return sums[catId];
+  };
+
+  // period filters
+  const start = parseISODate($("periodStart")?.value);
+  const end   = parseISODate($("periodEnd")?.value);
+  const breaks = parseBreaks($("periodBreaks")?.value || "");
+
+  const inPeriod = (tx)=>{
+    if (!tx.date) return true;
+    if (!inRange(tx.date, start, end)) return false;
+    if (isInBreaks(tx.date, breaks)) return false;
+    return true;
+  };
+
+  // transactions
+  for (const tx of state.transactions){
+    if (!inPeriod(tx)) continue;
+    const cat = tx.categoryId;
+    if (!cat) continue;
+    const bucket = ensure(cat);
+    const amt = Number(tx.amount||0);
+
+    // realized
+    if (tx.statusKind === "consumed" || tx.statusRaw === "budget_real"){
+      bucket.real += amt;
+      bucket.prev += amt; // realized is part of forecast
+    } else {
+      // engaged/unknown counts for forecast only
+      bucket.prev += amt;
+    }
+  }
+
+  // manual adjustments
+  for (const [catId, m] of Object.entries(state.manual)){
+    const bucket = ensure(catId);
+    bucket.real += Number(m.real||0);
+    bucket.prev += Number(m.prev||0);
+  }
+
+  return sums;
+}
+
+function totalsFromSums(sums){
+  const isRec = (catId)=> state.categories.recettes.some(c=>c.id===catId);
+  const isDep = (catId)=> state.categories.depenses.some(c=>c.id===catId);
+
+  let recReal=0, recPrev=0, depReal=0, depPrev=0;
+  for (const [catId, v] of Object.entries(sums)){
+    if (isRec(catId)){ recReal += v.real; recPrev += v.prev; }
+    if (isDep(catId)){ depReal += v.real; depPrev += v.prev; }
+  }
+  return { recReal, recPrev, depReal, depPrev };
+}
+
+/* ==============================
+  Alerting (5% + sensibilité Sep–Déc)
+============================== */
+function computeThreshold(depPrev){
+  const pct = Number($("baseThresholdPct")?.value || state.alerting.baseThresholdPct);
+  const factor = Number($("sepDecFactor")?.value || state.alerting.sepDecFactor);
+
+  const start = parseISODate($("periodStart")?.value);
+  const m = start ? (start.getMonth()+1) : null;
+  const seasonal = (m && m>=9 && m<=12) ? factor : 1.0;
+
+  return (depPrev * (pct/100)) * seasonal;
+}
+
+function renderAlert(cnPrev, depPrev){
+  const box = $("alertBox");
+  if (!box) return;
+
+  const threshold = computeThreshold(depPrev);
+
+  box.innerHTML = "";
+  if (cnPrev <= 0){
+    box.innerHTML = `
+      <div class="alert alert-danger border">
+        <div class="fw-semibold"><i class="bi bi-exclamation-triangle-fill me-2"></i>ALERTE – Crédit nourriture ≤ 0</div>
+        <div class="mt-1">Campagne de recettes à déclencher immédiatement.</div>
+        <div class="mt-2"><span class="badge text-bg-light border">Montant TR indicatif</span>
+          <span class="fw-semibold">${FR.fmtMoney(Math.abs(cnPrev) + threshold)}</span>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (cnPrev <= threshold){
+    box.innerHTML = `
+      <div class="alert alert-warning border">
+        <div class="fw-semibold"><i class="bi bi-exclamation-circle-fill me-2"></i>Attention – Crédit nourriture fragile</div>
+        <div class="mt-1">Seuil dynamique : ${FR.fmtMoney(threshold)} (base 5% × facteur saison).</div>
+        <div class="mt-2"><span class="badge text-bg-light border">TR recommandé (indicatif)</span>
+          <span class="fw-semibold">${FR.fmtMoney(threshold - cnPrev)}</span>
+        </div>
+      </div>`;
+  }
+}
+
+/* ==============================
+  Chart (réel vs prévisionnel)
+============================== */
+let cnChart = null;
+
+function renderChart(recReal, recPrev, depReal, depPrev){
+  const canvas = $("cnChart");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  const cnReal = recReal - depReal;
+  const cnPrev = recPrev - depPrev;
+
+  if (cnChart) cnChart.destroy();
+
+  cnChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: ["Recettes", "Dépenses", "Crédit nourriture"],
+      datasets: [
+        {
+          label: "Réalisé",
+          data: [recReal, depReal, cnReal]
+        },
+        {
+          label: "Prévisionnel",
+          data: [recPrev, depPrev, cnPrev]
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: "bottom" },
+        tooltip: {
+          callbacks: {
+            label: (ctx)=> `${ctx.dataset.label}: ${FR.fmtMoney(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: (v)=> FR.fmtMoney(v)
+          }
+        }
+      }
+    }
+  });
+}
+
+/* ==============================
+  KPI rendering
+============================== */
+function setText(id, txt){
+  const el = $(id);
+  if (el) el.textContent = txt;
+}
+
+function recalcAll(){
+  // sync period/rules
+  if ($("periodStart")) state.period.start = $("periodStart").value;
+  if ($("periodEnd")) state.period.end = $("periodEnd").value;
+  if ($("periodBreaks")) state.period.breaksText = $("periodBreaks").value || "";
+
+  if ($("baseThresholdPct")) state.alerting.baseThresholdPct = Number($("baseThresholdPct").value || 5.0);
+  if ($("sepDecFactor")) state.alerting.sepDecFactor = Number($("sepDecFactor").value || 1.5);
+
+  // build sums
+  const sums = sumsByCategory();
+  const totals = totalsFromSums(sums);
+
+  // KPIs
+  setText("kpiRevActual", FR.fmtMoney(totals.recReal));
+  setText("kpiRevForecast", FR.fmtMoney(totals.recPrev));
+  setText("kpiSpendActual", FR.fmtMoney(totals.depReal));
+  setText("kpiSpendForecast", FR.fmtMoney(totals.depPrev));
+
+  const cnReal = totals.recReal - totals.depReal;
+  const cnPrev = totals.recPrev - totals.depPrev;
+
+  setText("kpiCreditFood", FR.fmtMoney(cnPrev));
+  setText("creditFoodBox", FR.fmtMoney(cnPrev));
+
+  renderAlert(cnPrev, totals.depPrev);
+  renderChart(totals.recReal, totals.recPrev, totals.depReal, totals.depPrev);
+}
+
+/* ==============================
+  Local persistence (optionnel)
+============================== */
+const LOCAL_KEY = "SRH_CREDIT_NOURRITURE_V2";
+
+function saveLocalMaybe(){
+  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); } catch {}
+}
+
+function loadLocalMaybe(){
+  try{
+    const s = localStorage.getItem(LOCAL_KEY);
+    if (!s) return false;
+    const obj = JSON.parse(s);
+    if (obj && obj.categories && obj.transactions){
+      Object.assign(state, obj);
+      return true;
+    }
+  }catch{}
+  return false;
+}
+
+/* ==============================
+  Export / Import JSON (fichier de suivi)
+============================== */
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "suivi_credit_nourriture_v2.json";
+  a.click();
+}
+
+function importJSON(input){
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const obj = JSON.parse(e.target.result);
+      Object.assign(state, obj);
+      initDefaults();
+      buildCategoryTables();
+      renderTransactions();
+      recalcAll();
+      saveLocalMaybe();
+    }catch(err){
+      alert("Fichier JSON invalide.");
+    }
+  };
+  reader.readAsText(file, "utf-8");
+}
+
+/* ==============================
+  Bindings (imports + mapping + actions)
+============================== */
+async function handleCLCAImport(file){
+  const wb = await readWorkbookFromFile(file);
+  const { rows } = sheetToRows(wb);
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  setupClcaMapping(headers);
+  // store rows temporarily for “appliquer mapping”
+  window.__clcaRows = rows;
+  // show modal/section mapping if you have it
+  if ($("lastImport")) $("lastImport").value = `CLCA: ${file.name} (${headers.length} colonnes)`;
+}
+
+async function handleBudgetImport(file){
+  const wb = await readWorkbookFromFile(file);
+  const { rows } = sheetToRows(wb);
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  setupBudgetMapping(headers);
+  window.__budRows = rows;
+  if ($("lastImport")) $("lastImport").value = `Budget: ${file.name} (${headers.length} colonnes)`;
+}
+
+function applyPendingImports(){
+  if (window.__clcaRows && window.__clcaRows.length){
+    applyClcaRows(window.__clcaRows);
+    window.__clcaRows = null;
+  }
+  if (window.__budRows && window.__budRows.length){
+    applyBudgetRows(window.__budRows);
+    window.__budRows = null;
+  }
+  reclassAll();
+  saveLocalMaybe();
+}
+
+function bindUI(){
+  // re-calc on parameter changes
+  ["periodStart","periodEnd","periodBreaks","baseThresholdPct","sepDecFactor","rulesRevenue","rulesSpend"]
+    .forEach(id=>{
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("change", ()=>{ recalcAll(); saveLocalMaybe(); });
+      el.addEventListener("input", ()=>{ recalcAll(); });
+    });
+
+  // file inputs
+  const clcaFile = $("clcaFile");
+  if (clcaFile){
+    clcaFile.addEventListener("change", async (e)=>{
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try{ await handleCLCAImport(file); }
+      catch(err){ alert("Import CLCA impossible (format)."); }
+    });
+  }
+
+  const budgetFile = $("budgetFile");
+  if (budgetFile){
+    budgetFile.addEventListener("change", async (e)=>{
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try{ await handleBudgetImport(file); }
+      catch(err){ alert("Import budget impossible (format)."); }
+    });
+  }
+
+  // mapping select changes persist
+  ["mapClcaDate","mapClcaAmount","mapClcaLabel","mapClcaStatus","mapClcaVendor",
+   "mapBudKey","mapBudLabel","mapBudReal","mapBudPrev","mapBudType"]
+    .forEach(id=>{
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("change", ()=> saveLocalMaybe());
+    });
+
+  // Buttons if present
+  const btnApply = $("btnApplyImports");
+  if (btnApply) btnApply.addEventListener("click", applyPendingImports);
+
+  const btnReclass = $("btnReclass");
+  if (btnReclass) btnReclass.addEventListener("click", reclassAll);
+
+  const btnExport = $("btnExportJSON");
+  if (btnExport) btnExport.addEventListener("click", exportJSON);
+
+  const btnClear = $("btnClearAll");
+  if (btnClear){
+    btnClear.addEventListener("click", ()=>{
+      if (!confirm("Effacer transactions et ajustements ?")) return;
+      state.transactions = [];
+      state.manual = {};
+      buildCategoryTables();
+      renderTransactions();
+      recalcAll();
+      saveLocalMaybe();
+    });
+  }
+}
+
+/* ==============================
+  BOOT
+============================== */
+document.addEventListener("DOMContentLoaded", ()=>{
+  loadLocalMaybe();
+  initDefaults();
+  buildCategoryTables();
+  renderTransactions();
+  bindUI();
+  recalcAll();
+});
+
+/* Expose export/import for inline handlers if needed */
+window.exportJSON = exportJSON;
+window.importJSON = importJSON;
+window.reclassAll = reclassAll;
+window.applyPendingImports = applyPendingImports;
+
 </script>
 </body>
+</html>
