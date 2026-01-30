@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Crédit nourriture – Pilotage SRH (OP@LE / CLCA)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Bootstrap 5 (même base que la page de référence) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+  <!-- SheetJS (XLSX) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.4;
+    }
+    body{
+      background:#f7f8fb;
+      padding-bottom:6rem;
+    }
+    .page{
+      background:#fff;
+      border-radius:0.75rem;
+      box-shadow:0 .25rem 1rem rgba(0,0,0,.06);
+      padding:1.5rem;
+    }
+    .muted-hint{ color:#6c757d; font-size:.925rem; }
+    .kpi{
+      background:#fff;
+      border:1px solid #eef1f6;
+      border-radius:0.75rem;
+      padding:1rem;
+      box-shadow:0 .15rem .75rem rgba(0,0,0,.04);
+    }
+    .kpi .label{ color:#6c757d; font-size:.9rem; }
+    .kpi .value{ font-size:1.35rem; font-weight:700; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+    .table thead th{
+      background:#f4f6fa;
+      border-bottom:1px solid #e8ecf5;
+    }
+    .sticky-actions{
+      position:fixed; left:0; right:0; bottom:0;
+      background:rgba(247,248,251,.95);
+      backdrop-filter: blur(6px);
+      border-top:1px solid #e8ecf5;
+      padding:.75rem 0;
+      z-index: 50;
+    }
+    .badge-soft{
+      background:#eef3ff; color:#274690; border:1px solid #dbe6ff;
+      font-weight:600;
+    }
+    .form-control, .form-select{
+      border-radius:.6rem;
+    }
+    .btn{
+      border-radius:.6rem;
+    }
+    .nav-pills .nav-link{
+      border-radius:.75rem;
+    }
+    .smallcap{ font-variant-caps: all-small-caps; letter-spacing:.03em; }
+  </style>
+</head>
+
+<body>
+<div class="container my-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Crédit nourriture – Pilotage SRH</h1>
+      <div class="muted-hint">
+        Import CLCA (OP@LE) + prévision recettes SRH (tickets/forfaits/CFA/commensaux) + calcul crédit nourriture.
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary" id="btnExportJSON"><i class="bi bi-download"></i> Export JSON</button>
+      <label class="btn btn-outline-secondary mb-0">
+        <i class="bi bi-upload"></i> Import JSON
+        <input type="file" id="importJSON" accept="application/json" hidden>
+      </label>
+      <button class="btn btn-primary" id="btnSave"><i class="bi bi-check2-circle"></i> Sauvegarder</button>
+    </div>
+  </div>
+
+  <div class="page">
+
+    <ul class="nav nav-pills gap-2 mb-3" id="tabs">
+      <li class="nav-item"><button class="nav-link active" data-tab="tab-kpi"><i class="bi bi-speedometer2"></i> Synthèse</button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="tab-periodes"><i class="bi bi-calendar3"></i> Périodes & vacances</button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="tab-tarifs"><i class="bi bi-cash-coin"></i> Tarifs</button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="tab-volumes"><i class="bi bi-box-seam"></i> Volumes & recettes</button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="tab-clca"><i class="bi bi-file-earmark-spreadsheet"></i> Import CLCA & dépenses</button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="tab-credit"><i class="bi bi-calculator"></i> Crédit nourriture</button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="tab-ratios"><i class="bi bi-graph-up"></i> Ratios</button></li>
+      <li class="nav-item"><button class="nav-link" data-tab="tab-param"><i class="bi bi-sliders"></i> Paramètres</button></li>
+    </ul>
+
+    <!-- ===================== Synthèse ===================== -->
+    <section id="tab-kpi" class="tab-section">
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <div class="kpi">
+            <div class="label">Recettes SRH prévues (période sélectionnée)</div>
+            <div class="value" id="kpiRecettesPrevues">—</div>
+            <div class="muted-hint">Calculées via volumes × tarifs (tickets/forfaits/CFA/commensaux + extra).</div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="kpi">
+            <div class="label">Dépenses “Crédit nourriture” (engagées / consommées)</div>
+            <div class="value" id="kpiDepCN">—</div>
+            <div class="muted-hint">À partir de CLCA (comptes CN configurables).</div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="kpi">
+            <div class="label">Crédit nourriture disponible (réalisé)</div>
+            <div class="value" id="kpiCreditDispo">—</div>
+            <div class="muted-hint">Ressources réalisées − Reversement − Hors CN − Dépenses CN.</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-lg-4">
+          <label class="form-label">Période active (pour KPIs)</label>
+          <select class="form-select" id="activePeriode"></select>
+        </div>
+        <div class="col-12 col-lg-8">
+          <div class="alert alert-info mb-0">
+            <div class="d-flex gap-2 align-items-start">
+              <i class="bi bi-info-circle mt-1"></i>
+              <div>
+                <div><strong>Logique de calcul</strong> : l’outil vous donne un prévisionnel SRH (recettes) et rapproche les dépenses issues de CLCA, puis calcule un <strong>crédit nourriture</strong> prévisionnel et réalisé.</div>
+                <div class="muted-hint mt-1">Pour être robuste à vos exports CLCA, vous mappez les colonnes après import (section “Import CLCA & dépenses”).</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Périodes & vacances ===================== -->
+    <section id="tab-periodes" class="tab-section d-none">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2 class="h5 mb-1">Périodes scolaires & vacances</h2>
+          <div class="muted-hint">Les vacances “coupent” le service : on exclut ces dates des jours de restauration.</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-primary" id="btnAddPeriode"><i class="bi bi-plus-circle"></i> Ajouter une période</button>
+          <button class="btn btn-outline-primary" id="btnAddVac"><i class="bi bi-plus-circle"></i> Ajouter vacances</button>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-7">
+          <h3 class="h6">Périodes</h3>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle" id="tblPeriodes">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Début</th>
+                  <th>Fin</th>
+                  <th class="text-end">Jours service (calc.)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="muted-hint">
+            Par défaut, les “jours service” = jours ouvrés (lundi–vendredi) entre début/fin, moins vacances.
+            Vous pouvez inclure les week-ends si vous servez (paramètres).
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+          <h3 class="h6">Vacances (exclusions)</h3>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle" id="tblVacances">
+              <thead>
+                <tr>
+                  <th>Libellé</th>
+                  <th>Début</th>
+                  <th>Fin</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="alert alert-light border mt-3 mb-0">
+            <div class="smallcap text-secondary mb-1">Conseil d’usage</div>
+            <div class="muted-hint mb-0">
+              Pour une période (ex. T2), saisissez la période civile (01/04 → 15/07) puis ajoutez les vacances (printemps, ponts, etc.). Le calcul des jours s’ajuste automatiquement.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Tarifs ===================== -->
+    <section id="tab-tarifs" class="tab-section d-none">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2 class="h5 mb-1">Tarifs SRH</h2>
+          <div class="muted-hint">Élèves (pré-rempli), commensaux, CFA. Modifiez selon vos arrêtés et grilles.</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" id="btnResetTarifs"><i class="bi bi-arrow-counterclockwise"></i> Réinitialiser (modèle)</button>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <h3 class="h6">Élèves – prestations / forfaits (4 tranches)</h3>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle" id="tblTarifsEleves">
+          <thead>
+          <tr>
+            <th style="min-width:170px">Régime</th>
+            <th class="text-center">Code</th>
+            <th class="text-end">Nb jours forfait</th>
+            <th class="text-end">Petits dej.</th>
+            <th class="text-end">Déjeuners</th>
+            <th class="text-end">Dîners</th>
+            <th class="text-end">Nuitées</th>
+            <th class="text-end">Tr.1 (€)</th>
+            <th class="text-end">Tr.2 (€)</th>
+            <th class="text-end">Tr.3 (€)</th>
+            <th class="text-end">Tr.4 (€)</th>
+          </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <h3 class="h6">Commensaux (4 tarifs)</h3>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle" id="tblTarifsCommensaux">
+              <thead>
+                <tr>
+                  <th>Libellé</th>
+                  <th class="text-end">Tarif (€)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button class="btn btn-outline-primary btn-sm" id="btnAddCommensal"><i class="bi bi-plus-circle"></i> Ajouter</button>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <h3 class="h6">CFA</h3>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label">Ticket CFA (€)</label>
+              <input type="number" step="0.01" class="form-control" id="tarifCfaTicket">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Nuitée CFA (€)</label>
+              <input type="number" step="0.01" class="form-control" id="tarifCfaNuitee">
+            </div>
+          </div>
+          <div class="muted-hint mt-2">
+            Interne CFA = 2 tickets + 1 nuitée (donc : 2 × ticket + nuitée).
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Volumes & recettes ===================== -->
+    <section id="tab-volumes" class="tab-section d-none">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2 class="h5 mb-1">Volumes prévisionnels & recettes attendues</h2>
+          <div class="muted-hint">Saisissez vos effectifs/volumes par période. L’outil calcule les recettes attendues (prépa TR).</div>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-lg-4">
+          <label class="form-label">Période</label>
+          <select class="form-select" id="periodeVolumes"></select>
+        </div>
+        <div class="col-12 col-lg-8">
+          <div class="alert alert-light border mb-0">
+            <div class="d-flex gap-2 align-items-start">
+              <i class="bi bi-receipt mt-1"></i>
+              <div>
+                <div><strong>Recettes attendues</strong> = forfaits + tickets (élèves) + commensaux + CFA + extra.</div>
+                <div class="muted-hint">Les forfaits élèves utilisent la tranche 1–4 (à paramétrer). Les tickets élèves sont représentés par la ligne “TICKET ELEVES”.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <h3 class="h6">Élèves – effectifs prévus (forfaits)</h3>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle" id="tblVolumesEleves">
+          <thead>
+            <tr>
+              <th>Régime</th>
+              <th class="text-end">Tr.1 (nb)</th>
+              <th class="text-end">Tr.2 (nb)</th>
+              <th class="text-end">Tr.3 (nb)</th>
+              <th class="text-end">Tr.4 (nb)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3 class="h6 mt-4">Tickets / commensaux / CFA / extra</h3>
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center">
+                <div class="fw-semibold">Tickets élèves (prévu)</div>
+                <span class="badge text-bg-light border">par tranche</span>
+              </div>
+              <div class="row g-2 mt-1">
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Tr.1</label>
+                  <input type="number" min="0" class="form-control" id="volTicketT1">
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Tr.2</label>
+                  <input type="number" min="0" class="form-control" id="volTicketT2">
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Tr.3</label>
+                  <input type="number" min="0" class="form-control" id="volTicketT3">
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Tr.4</label>
+                  <input type="number" min="0" class="form-control" id="volTicketT4">
+                </div>
+              </div>
+              <div class="muted-hint mt-2">Le tarif ticket est celui de la ligne “TICKET ELEVES”.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Commensaux (prévu)</div>
+              <div class="table-responsive mt-2">
+                <table class="table table-sm align-middle mb-0" id="tblVolumesCommensaux">
+                  <thead>
+                    <tr>
+                      <th>Tarif</th>
+                      <th class="text-end">Nb repas</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div class="muted-hint mt-2">Les libellés/tarifs proviennent de l’onglet Tarifs.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">CFA (prévu)</div>
+              <div class="row g-2 mt-1">
+                <div class="col-6">
+                  <label class="form-label">Nb tickets CFA</label>
+                  <input type="number" min="0" class="form-control" id="volCfaTickets">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Nb internes CFA</label>
+                  <input type="number" min="0" class="form-control" id="volCfaInternes">
+                </div>
+              </div>
+              <div class="muted-hint mt-2">
+                Interne CFA = 2 tickets + 1 nuitée.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Ressources “extra” (prévu)</div>
+              <label class="form-label mt-2">Montant (€)</label>
+              <input type="number" step="0.01" class="form-control" id="volExtra">
+              <div class="muted-hint mt-2">Location SRH, projets pédagogiques, etc.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="kpi">
+            <div class="label">Total recettes attendues (période)</div>
+            <div class="value" id="kpiRecettesPeriode">—</div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="kpi">
+            <div class="label">Détail TR conseillé</div>
+            <div class="value" id="kpiTR">—</div>
+            <div class="muted-hint">Indication synthétique (à adapter à vos pratiques et pièces justificatives).</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===================== Import CLCA & dépenses ===================== -->
+    <section id="tab-clca" class="tab-section d-none">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2 class="h5 mb-1">Import CLCA (lignes de commandes d’achats) & dépenses</h2>
+          <div class="muted-hint">Import XLSX puis “mapping” des colonnes. Les agrégats sont calculés par période (date) et par comptes.</div>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <label class="form-label">Fichier CLCA (XLSX)</label>
+          <input type="file" class="form-control" id="fileCLCA" accept=".xlsx,.xls">
+          <div class="muted-hint mt-2">
+            Astuce : vous pouvez importer plusieurs fois (cela remplace le jeu de données CLCA en mémoire).
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="alert alert-light border mb-0">
+            <div class="d-flex gap-2 align-items-start">
+              <i class="bi bi-clipboard-data mt-1"></i>
+              <div>
+                <div><strong>Mapping</strong> : choisissez les colonnes correspondant à la date, au compte, et aux montants (engagé / consommé).</div>
+                <div class="muted-hint">Si votre CLCA ne contient pas “consommé”, vous pouvez mapper sur “Montant facturé” ou “Montant payé”.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div id="mappingBox" class="d-none">
+        <h3 class="h6">Mapping des colonnes (feuille importée)</h3>
+        <div class="row g-3">
+          <div class="col-12 col-md-3">
+            <label class="form-label">Date (commande / ligne)</label>
+            <select class="form-select" id="mapDate"></select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Compte</label>
+            <select class="form-select" id="mapCompte"></select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Montant engagé</label>
+            <select class="form-select" id="mapEngage"></select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Montant consommé</label>
+            <select class="form-select" id="mapConsomme"></select>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-primary" id="btnApplyMapping"><i class="bi bi-lightning-charge"></i> Calculer les agrégats</button>
+          <button class="btn btn-outline-secondary" id="btnClearCLCA"><i class="bi bi-trash"></i> Effacer CLCA</button>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <label class="form-label">Période (pour l’affichage)</label>
+          <select class="form-select" id="periodeCLCA"></select>
+        </div>
+        <div class="col-12 col-lg-8">
+          <div class="alert alert-info mb-0">
+            <div class="d-flex gap-2 align-items-start">
+              <i class="bi bi-funnel mt-1"></i>
+              <div>
+                <div><strong>Filtrage automatique</strong> : seules les lignes dont la date est dans la période sélectionnée sont prises.</div>
+                <div class="muted-hint">Les comptes “CN” et “Hors CN” sont configurables (onglet Paramètres).</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="kpi">
+            <div class="label">Total engagé (période)</div>
+            <div class="value" id="kpiEngagePeriode">—</div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="kpi">
+            <div class="label">Total consommé (période)</div>
+            <div class="value" id="kpiConsommePeriode">—</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <h3 class="h6">Détail par familles (CN vs Hors CN)</h3>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle" id="tblCLCAAgg">
+          <thead>
+            <tr>
+              <th>Famille</th>
+              <th class="text-end">Engagé (€)</th>
+              <th class="text-end">Consommé (€)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <details class="mt-3">
+        <summary class="text-secondary">Voir un extrait des lignes importées (debug)</summary>
+        <pre class="mt-2 p-3 bg-light border rounded-3 small mono" id="clcaPreview" style="max-height:280px; overflow:auto;"></pre>
+      </details>
+    </section>
+
+    <!-- ===================== Crédit nourriture ===================== -->
+    <section id="tab-credit" class="tab-section d-none">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2 class="h5 mb-1">Calcul du crédit nourriture</h2>
+          <div class="muted-hint">
+            Ressources = recettes SRH (tickets/forfaits/CFA/commensaux) + autres recettes + extra.<br>
+            Emplois = reversement CT + dépenses hors CN (VIAB + autres charges SRH) + dépenses CN (bol alimentaire).
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-lg-4">
+          <label class="form-label">Période</label>
+          <select class="form-select" id="periodeCredit"></select>
+        </div>
+        <div class="col-12 col-lg-8">
+          <div class="alert alert-light border mb-0">
+            <div class="d-flex gap-2 align-items-start">
+              <i class="bi bi-bank mt-1"></i>
+              <div>
+                <div><strong>Prévisionnel</strong> : basé sur volumes & tarifs (recettes) + prévisions de reversement/charges.</div>
+                <div class="muted-hint">Le <strong>réalisé</strong> utilise les recettes reçues + dépenses CLCA (si importé) + charges réellement engagées/consommées.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Ressources (réalisé)</div>
+
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label class="form-label">Recettes SRH reçues (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="recettesRecues">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Autres recettes affectées (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="autresRecettes">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Extra reçu (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="extraRecu">
+                </div>
+              </div>
+
+              <div class="muted-hint mt-2">
+                Exemple “autres recettes” : dégradations, snacking, etc. (selon votre paramétrage budgétaire SRH).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Emplois (réalisé)</div>
+
+              <div class="row g-2 mt-2">
+                <div class="col-12">
+                  <label class="form-label">Reversement CT réalisé (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="reversementCT">
+                </div>
+              </div>
+
+              <hr class="my-3">
+
+              <div class="fw-semibold">Dépenses hors CN (VIAB + charges SRH)</div>
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label class="form-label">Eau (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="viabEau">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Gaz (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="viabGaz">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Électricité (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="viabElec">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Chauffage urbain (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="viabChauffUrb">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Autres charges SRH hors CN (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="autresChargesSRH">
+                </div>
+              </div>
+
+              <div class="muted-hint mt-2">
+                Ces charges “hors CN” sont celles qui consomment la marge SRH (hors achats alimentaires).
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <div class="kpi">
+            <div class="label">Crédit nourriture prévisionnel (période)</div>
+            <div class="value" id="kpiCreditPrev">—</div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="kpi">
+            <div class="label">Crédit nourriture réalisé (période)</div>
+            <div class="value" id="kpiCreditReal">—</div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="kpi">
+            <div class="label">Reste à engager (CN)</div>
+            <div class="value" id="kpiResteAEngager">—</div>
+            <div class="muted-hint">= crédit réalisé − (CN consommé + CN engagé non consommé).</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Bloc</th>
+              <th class="text-end">Prévisionnel (€)</th>
+              <th class="text-end">Réalisé (€)</th>
+            </tr>
+          </thead>
+          <tbody id="tblCreditDetail"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== Ratios ===================== -->
+    <section id="tab-ratios" class="tab-section d-none">
+      <div>
+        <h2 class="h5 mb-1">Ratios de pilotage</h2>
+        <div class="muted-hint">Comparaison “prévu / reçu” (recettes) et “engagé / consommé” (dépenses obligatoires).</div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <label class="form-label">Période</label>
+          <select class="form-select" id="periodeRatios"></select>
+        </div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Dépenses obligatoires</div>
+              <div class="muted-hint">Saisissez le montant obligatoire engagé et consommé (contrats/VIAB/forfaits…).</div>
+
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label class="form-label">Engagées (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="depOblEng">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Consommées (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="depOblCons">
+                </div>
+              </div>
+
+              <div class="kpi mt-3">
+                <div class="label">Ratio engagé / consommé</div>
+                <div class="value" id="kpiRatioDepObl">—</div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Recettes (tickets / internes / CFA)</div>
+              <div class="muted-hint">Prévu = calcul volumes & tarifs. Reçu = saisie (ou import futur si vous ajoutez un export recettes).</div>
+
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label class="form-label">Recettes prévues (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="recettesPrevSaisie" disabled>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Recettes reçues (€)</label>
+                  <input type="number" step="0.01" class="form-control" id="recettesRecuesRatio">
+                </div>
+              </div>
+
+              <div class="kpi mt-3">
+                <div class="label">Ratio prévu / reçu</div>
+                <div class="value" id="kpiRatioRecettes">—</div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===================== Paramètres ===================== -->
+    <section id="tab-param" class="tab-section d-none">
+      <div>
+        <h2 class="h5 mb-1">Paramètres</h2>
+        <div class="muted-hint">Définissez vos comptes “Crédit nourriture” (CN) et éventuellement des familles hors CN.</div>
+      </div>
+
+      <hr class="my-3">
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Comptes CN (bol alimentaire)</div>
+              <label class="form-label mt-2">Liste de comptes (séparés par virgule)</label>
+              <input class="form-control mono" id="comptesCN" placeholder="ex: 6011, 6022, 6068">
+              <div class="muted-hint mt-2">Utilisé pour classer les lignes CLCA en “CN”.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Comptes hors CN (facultatif)</div>
+              <label class="form-label mt-2">Liste de comptes (séparés par virgule)</label>
+              <input class="form-control mono" id="comptesHorsCN" placeholder="ex: 6063, 615, 6061, 613">
+              <div class="muted-hint mt-2">Si vide : “hors CN” = tout ce qui n’est pas CN.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Calcul jours de service</div>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="inclureWeekend">
+                <label class="form-check-label" for="inclureWeekend">Inclure samedi/dimanche</label>
+              </div>
+              <div class="muted-hint mt-2">
+                Si votre SRH sert le week-end (internat), activez.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm" style="border-radius:.75rem;">
+            <div class="card-body">
+              <div class="fw-semibold">Convention : TR conseillé</div>
+              <label class="form-label mt-2">Texte indicatif (optionnel)</label>
+              <textarea class="form-control" id="trConvention" rows="3"
+                placeholder="ex: TR mensuel : tickets+forfaits, CFA, commensaux, extra..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="alert alert-warning mb-0">
+        <div class="d-flex gap-2 align-items-start">
+          <i class="bi bi-shield-exclamation mt-1"></i>
+          <div>
+            <div><strong>Point d’attention</strong> : l’outil est un tableau de bord. Pour fiabiliser, harmonisez vos exports (colonnes CLCA, dates) et verrouillez vos conventions de comptes CN/hors CN.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="sticky-actions">
+  <div class="container d-flex flex-wrap gap-2 justify-content-between align-items-center">	
+    <div class="muted-hint">
+      <span class="badge badge-soft">Local</span>
+      Données stockées dans votre navigateur (localStorage). Pensez à exporter JSON pour archivage.
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" id="btnRecalc"><i class="bi bi-arrow-repeat"></i> Recalculer</button>
+      <button class="btn btn-primary btn-sm" id="btnSave2"><i class="bi bi-check2-circle"></i> Sauvegarder</button>
+    </div>
+  </div>
+  <div class="container d-flex flex-wrap gap-2 justify-content-between align-items-center">	<div class="muted-hint">
+    <span id="app-version"> Version</span>
+  </div></div>
+</div>
+
+
+
+<script>
+/**
+ * Outil Op@le - suivi du crédit nourriture
+ * Basé sur exports Op@le : CLCA
+ *
+ * @version 0.0.1
+ * @author Yann Bogdanovic
+ * @description
+ *  - Outil OP@LE suivi du crédit nourriture
+ */
+	const APP_VERSION = "CIMR OP@LE - 0.0.1";
+	window.addEventListener("DOMContentLoaded", () => {
+		const el = document.getElementById("app-version");
+		if (el) el.textContent = APP_VERSION;
+	});
+	
+</script>
+</body>

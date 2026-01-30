@@ -1,0 +1,4669 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>M@TRISK - Pilotage des risques, des processus et de la conformité</title>
+    <script src="https://cdn.jsdelivr.net/npm/docx/build/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --cell-size: 84px;
+            --grid-gap: 6px;
+        }
+
+        body {
+            background: #f6f7f9;
+        }
+
+        .card {
+            border: 0;
+            border-radius: 14px;
+        }
+
+        .shadow-soft {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        .small-muted {
+            color: #6c757d;
+            font-size: .9rem;
+        }
+
+        .pill {
+            border: 1px solid rgba(0, 0, 0, .12);
+            border-radius: 999px;
+            padding: .15rem .6rem;
+            font-size: .85rem;
+            background: #fff;
+        }
+
+        /* Matrix */
+        .matrix-wrap {
+            overflow-x: auto;
+        }
+
+        .matrix-area {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 12px;
+            align-items: start;
+        }
+
+        @media (max-width: 1200px) {
+            .matrix-area {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .matrix {
+            display: grid;
+            grid-template-columns: 120px repeat(5, var(--cell-size));
+            grid-template-rows: 48px repeat(5, var(--cell-size));
+            gap: var(--grid-gap);
+            align-items: stretch;
+            min-width: calc(120px + 5*var(--cell-size) + 5*var(--grid-gap));
+        }
+
+        #matrixOverlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 5;
+            /* au-dessus des cases, sous les popovers si besoin */
+        }
+
+        #riskMatrixWrap {
+            position: relative;
+        }
+
+        .m-head,
+        .m-side {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, .08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .m-side {
+            padding: 0 10px;
+            justify-content: flex-start;
+        }
+
+        .cell {
+            position: relative;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, .10);
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .cell .score {
+            position: absolute;
+            bottom: 6px;
+            right: 8px;
+            font-size: .8rem;
+            opacity: .7;
+            font-weight: 600;
+        }
+
+        /* Heat colors */
+        .heat-g {
+            background: #cfe9d6;
+        }
+
+        .heat-y {
+            background: #ffe8a3;
+        }
+
+        .heat-o {
+            background: #ffc98a;
+        }
+
+        .heat-r {
+            background: #ffb3b3;
+        }
+
+        /* Markers */
+        .marker {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .75rem;
+            font-weight: 700;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, .12);
+            user-select: none;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, .9);
+        }
+
+        .marker.inherent {
+            background: #0d6efd;
+            color: #fff;
+            left: 10px;
+            top: 10px;
+        }
+
+        .marker.residual {
+            background: #198754;
+            color: #fff;
+            left: 44px;
+            top: 10px;
+        }
+
+        .marker.same {
+            left: 28px;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .dot-blue {
+            background: #0d6efd;
+        }
+
+        .dot-green {
+            background: #198754;
+        }
+
+        /* Filter list (right) */
+        .risk-list {
+            max-height: 420px;
+            overflow: auto;
+            border: 1px solid rgba(0, 0, 0, .08);
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        .risk-item {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(0, 0, 0, .06);
+        }
+
+        .risk-item:last-child {
+            border-bottom: 0;
+        }
+
+        .risk-item:hover {
+            background: rgba(13, 110, 253, .04);
+        }
+
+        .risk-item .meta {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .risk-item .meta .title {
+            font-weight: 600;
+            line-height: 1.15;
+        }
+
+        .risk-item .meta .sub {
+            font-size: .85rem;
+            color: #6c757d;
+        }
+
+        .risk-item .tag {
+            white-space: nowrap;
+        }
+
+        /* Table */
+        .table thead th {
+            white-space: nowrap;
+        }
+
+        .nowrap {
+            white-space: nowrap;
+        }
+
+        .required::after {
+            content: " *";
+            color: #dc3545;
+        }
+
+        /* Selected highlight in list */
+        .risk-item.selected {
+            outline: 2px solid rgba(13, 110, 253, .35);
+            outline-offset: -2px;
+            background: rgba(13, 110, 253, .06);
+        }
+
+        .mp-shape {
+            cursor: pointer;
+            filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .10));
+        }
+
+		.mp-tag.selected svg {
+			outline: 3px solid rgba(13, 110, 253, .65);
+			outline-offset: 4px;
+		}
+
+        .mp-label {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        }
+
+        .mp-row-selected {
+            outline: 2px solid rgba(13, 110, 253, .35);
+            outline-offset: -2px;
+            background: rgba(13, 110, 253, .06);
+        }
+
+        /* Zone (Pilotage / Métier / Support) : hauteur auto */
+        .mp-zone {
+            padding: 22px 22px 18px 22px;
+            border-radius: 18px;
+            min-height: unset;
+            /* IMPORTANT : enlève la hauteur mini fixe si tu en as */
+            height: auto;
+            /* IMPORTANT */
+        }
+
+        /* Titre de zone */
+        .mp-zone-title {
+            font-weight: 800;
+            letter-spacing: .5px;
+            margin: 0 0 14px 0;
+        }
+
+        /* Conteneur des polygones dans une zone */
+        .mp-zone-items {
+            display: flex;
+            flex-wrap: wrap;
+            /* IMPORTANT : retour à la ligne */
+            gap: 18px 18px;
+            /* espace horizontal/vertical */
+            align-items: flex-start;
+        }
+
+        /* Chaque “polygone” (cartouche) */
+        .mp-tag {
+            flex: 0 0 auto;
+            /* pas d'étirement qui écrase */
+            width: 230px;
+            /* ajuste si besoin */
+            max-width: 100%;
+        }
+
+        /* Si ce sont des <svg> inline, assure leur bloc */
+        .mp-tag svg,
+        svg.mp-tag {
+            display: block;
+            width: 230px;
+            /* même valeur que .mp-tag */
+            height: auto;
+        }
+
+        .mp-zone-p {
+            background: #eef5ff;
+        }
+
+        .mp-zone-p .mp-zone-title {
+            color: #0d6efd;
+        }
+
+        .mp-zone-m {
+            background: #effaef;
+        }
+
+        .mp-zone-m .mp-zone-title {
+            color: #198754;
+        }
+
+        .mp-zone-s {
+            background: #fff4e6;
+        }
+
+        .mp-zone-s .mp-zone-title {
+            color: #fd7e14;
+        }
+
+        .flow-step {
+            position: relative;
+        }
+
+        .flow-step::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: -10px;
+            width: 2px;
+            height: 16px;
+            background: rgba(0, 0, 0, .15);
+            transform: translateX(-50%);
+        }
+
+        .flow-last::after {
+            display: none;
+        }
+
+        .risk-badge {
+            cursor: pointer;
+        }
+
+        .step-card {
+            border: 1px solid rgba(0, 0, 0, .10);
+            border-radius: 12px;
+            padding: 8px 10px;
+            background: #fff;
+        }
+
+        .step-actions button {
+            padding: 2px 8px;
+        }
+
+        .word-export {
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 11pt;
+        }
+
+        .word-export h1 {
+            font-size: 20pt;
+        }
+
+        .word-export h2 {
+            font-size: 16pt;
+        }
+
+        .word-export h3 {
+            font-size: 14pt;
+        }
+
+        .word-export table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+
+        .word-export th,
+        .word-export td {
+            border: 1px solid #333;
+            padding: 4px 6px;
+        }
+
+        .word-export .page-break {
+            page-break-before: always;
+        }
+
+        .word-export svg {
+            max-width: 100%;
+            height: auto;
+            margin: 12px 0 20px 0;
+        }
+
+        @media (max-width: 768px) {
+
+            .mp-tag,
+            .mp-tag svg,
+            svg.mp-tag {
+                width: 100%;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+
+<body>
+    <div class="container-fluid py-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+            <div>
+                <h1 class="h3 mb-1">M@TRISK</h1>
+                <div class="small-muted">Pilotage des risques, des processus et de la conformité</div>
+            </div>
+            <div class="d-flex gap-2">
+                <div class="form-check form-switch me-2">
+                    <input class="form-check-input" type="checkbox" id="toggleSimpleMode">
+                    <label class="form-check-label small-muted" for="toggleSimpleMode">Mode simplifié</label>
+                </div>
+                <button class="btn btn-outline-primary d-none" id="btnExportPdf">Export PDF</button>
+                <button class="btn btn-outline-primary" id="btnExportWord">Export Word</button>
+
+                <button class="btn btn-outline-secondary" id="btnExport">Exporter JSON</button>
+                <button class="btn btn-outline-secondary" id="btnImport">Importer JSON</button>
+                <input type="file" id="fileImport" accept="application/json" class="d-none">
+                <button class="btn btn-outline-danger" id="btnReset">Réinitialiser</button>
+
+            </div>
+        </div>
+        <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-macroprocessus" type="button">
+                    Macroprocessus
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-processus" type="button">
+                    Processus
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-procedures" type="button">
+                    Procédures
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-risques" type="button">
+                    Risques
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-control-plan" type="button">
+                    Plan de contrôle interne
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-domains">
+                    Maîtrise des domaines
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mp-domains">
+                    Macroprocessus × Domaines
+                </button>
+            </li>
+
+        </ul>
+
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab-macroprocessus">
+                <div class="row g-3">
+                    <div class="col-xl-4">
+                        <div class="card shadow-soft p-3">
+                            <h5>Macroprocessus</h5>
+
+                            <label class="form-label">Type</label>
+                            <select class="form-select" id="mpType">
+                                <option value="P">Pilotage</option>
+                                <option value="M">Métier</option>
+                                <option value="S">Support</option>
+                            </select>
+
+                            <label class="form-label mt-2">Code</label>
+                            <input class="form-control" id="mpCode" placeholder="MPP01">
+
+                            <label class="form-label mt-2">Nom</label>
+                            <input class="form-control" id="mpName">
+
+                            <label class="form-label mt-2">Responsable</label>
+                            <input class="form-control" id="mpOwner">
+
+                            <label class="form-label mt-2">Objectifs</label>
+                            <textarea class="form-control" id="mpObjectives" rows="2"></textarea>
+
+                            <button class="btn btn-primary mt-3" id="btnSaveMP">Enregistrer</button>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-8">
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h5 class="mb-0">Cartographie des macroprocessus</h5>
+                                <div class="small text-muted">Pilotage (haut) · Métier (milieu) · Support (bas)</div>
+                            </div>
+
+                            <div class="border rounded-4 p-2 bg-white" id="mpMapWrap">
+                                <div>
+                                    <div class="mp-zone mp-zone-p">
+                                        <div class="mp-zone-title">PILOTAGE (P)</div>
+                                        <div class="mp-zone-items" id="mpZoneP"></div>
+                                    </div>
+
+                                    <div class="mp-zone mp-zone-m">
+                                        <div class="mp-zone-title">MÉTIER (M)</div>
+                                        <div class="mp-zone-items" id="mpZoneM"></div>
+                                    </div>
+
+                                    <div class="mp-zone mp-zone-s">
+                                        <div class="mp-zone-title">SUPPORT (S)</div>
+                                        <div class="mp-zone-items" id="mpZoneS"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="card shadow-soft p-3 mt-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h5 class="mb-0">Liste des macroprocessus</h5>
+                                <input class="form-control form-control-sm" id="mpSearch" style="max-width:320px;" placeholder="Rechercher (code, nom, type)…">
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Type</th>
+                                            <th>Nom</th>
+                                            <th>Responsable</th>
+                                            <th class="nowrap">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="mpTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+            <div class="tab-pane fade" id="tab-processus">
+                <div class="row g-3">
+                    <!-- Colonne gauche : liste des processus du macroprocessus sélectionné -->
+                    <div class="col-12 col-xl-4">
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h5 class="mb-0">Processus</h5>
+                                <span class="pill">MP <span class="mono" id="procMpBadge">—</span></span>
+                            </div>
+
+                            <div class="small text-muted mt-1">
+                                Double-clic sur un macroprocessus = ouverture ici + filtrage automatique.
+                            </div>
+
+                            <div class="mt-2">
+                                <label class="form-label mb-1">Macroprocessus</label>
+                                <select class="form-select form-select-sm" id="procMpSelect"></select>
+                            </div>
+
+                            <input class="form-control form-control-sm mt-2" id="procSearch" placeholder="Rechercher (code, nom)…">
+
+                            <div class="risk-list mt-2" id="procList" style="max-height:520px;"></div>
+
+                            <div class="d-flex gap-2 mt-2">
+                                <button class="btn btn-sm btn-primary" id="btnNewProcess">Nouveau</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="btnClearProcess">Vider</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Colonne droite : fiche ISO du processus -->
+                    <div class="col-12 col-xl-8">
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <h5 class="mb-0">Fiche processus</h5>
+                                <span class="pill">Risques <span class="mono" id="procRiskCount">0</span></span>
+                                <span class="pill">Code <span class="mono" id="procCodeBadge">—</span></span>
+                            </div>
+
+
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-4">
+                                    <label class="form-label required">Code</label>
+                                    <input class="form-control" id="procId" placeholder="MPP01-001">
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label required">Nom du processus</label>
+                                    <input class="form-control" id="procName" placeholder="Gestion des risques mails">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label">Pilote</label>
+                                    <input class="form-control" id="procPilot" placeholder="SGE">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Finalité / Objectif</label>
+                                    <input class="form-control" id="procPurpose" placeholder="Maîtriser les risques de la procédure mails">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Périmètre</label>
+                                    <input class="form-control" id="procScope" placeholder="EPLE – secrétariat / gestion / SRH…">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Entrées (inputs)</label>
+                                    <textarea class="form-control" id="procInputs" rows="2" placeholder="Courriels entrants, demandes usagers, pièces jointes…"></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Sorties (outputs)</label>
+                                    <textarea class="form-control" id="procOutputs" rows="2" placeholder="Courriels classés, décisions tracées, preuves auditables…"></textarea>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Ressources / moyens</label>
+                                    <textarea class="form-control" id="procResources" rows="2" placeholder="Outlook, arborescence partagée, droits, formations…"></textarea>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Interactions (amont / aval)</label>
+                                    <textarea class="form-control" id="procInteractions" rows="2" placeholder="Amont: direction / enseignants… Aval: compta, RH, vie scolaire…"></textarea>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Indicateurs / KPI</label>
+                                    <textarea class="form-control" id="procKpi" rows="2" placeholder="% mails classés < 30j, nb écarts inspection, délai réponse…"></textarea>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Risques & maîtrises (liens)</label>
+                                    <textarea class="form-control" id="procRisks" rows="2" placeholder="R1, R3… + contrôles C1… (on reliera automatiquement ensuite)"></textarea>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Documents applicables</label>
+                                    <textarea class="form-control" id="procDocs" rows="2" placeholder="Procédure mails v1.0, charte SI, RGPD…"></textarea>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2 mt-2">
+                                    <button class="btn btn-outline-secondary" id="btnViewProcedures">Voir procédures</button>
+
+                                    <button class="btn btn-primary" id="btnSaveProcess">Enregistrer</button>
+                                    <button class="btn btn-outline-danger" id="btnDeleteProcess">Supprimer</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card shadow-soft p-3 ">
+                            <h6 class="mb-2">Risques du processus</h6>
+                            <div id="processRiskTable"></div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+            <div class="tab-pane fade" id="tab-procedures">
+                <div class="row g-3">
+                    <!-- Gauche: sélection Processus + liste Procédures -->
+                    <div class="col-12 col-xl-4">
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h5 class="mb-0">Procédures</h5>
+                                <span class="pill">Processus <span class="mono" id="proc2ProcessBadge">—</span></span>
+                            </div>
+
+                            <div class="mt-2">
+                                <label class="form-label mb-1">Processus</label>
+                                <select class="form-select form-select-sm" id="proc2ProcessSelect"></select>
+                            </div>
+
+                            <input class="form-control form-control-sm mt-2" id="proc2Search" placeholder="Rechercher procédure…">
+
+                            <div class="risk-list mt-2" id="proc2List" style="max-height:520px;"></div>
+
+                            <div class="d-flex gap-2 mt-2">
+                                <button class="btn btn-sm btn-primary" id="btnNewProcedure">Nouvelle</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="btnClearProcedure">Vider</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Droite: fiche procédure + logigramme -->
+                    <div class="col-12 col-xl-8">
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <h5 class="mb-0">Logigramme – Qui ? / Fait quoi ? / Comment ?</h5>
+                                <span class="pill">Procédure <span class="mono" id="proc2Badge">—</span></span>
+                            </div>
+
+                            <div class="row g-2 mt-2">
+                                <div class="col-md-4">
+                                    <label class="form-label required">ID</label>
+                                    <input class="form-control" id="proc2Id" placeholder="PROC-MAILS">
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label required">Nom</label>
+                                    <input class="form-control" id="proc2Name" placeholder="Procédure de gestion des mails">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Version</label>
+                                    <input class="form-control" id="proc2Version" placeholder="1.0">
+                                </div>
+
+                                <div class="col-12 d-flex gap-2 mt-1">
+                                    <button class="btn btn-outline-secondary d-none" id="btnBackToProcedure">
+                                        ← Retour à la procédure
+                                    </button>
+
+                                    <button class="btn btn-primary" id="btnSaveProcedure">Enregistrer</button>
+                                    <button class="btn btn-outline-danger" id="btnDeleteProcedure">Supprimer</button>
+                                    <button class="btn btn-outline-secondary ms-auto" id="btnAddStep">+ Étape</button>
+                                </div>
+                            </div>
+
+                            <hr class="my-3">
+
+                            <!-- Editeur simple des étapes -->
+                            <div id="proc2StepsEditor" class="mb-3"></div>
+
+                            <!-- Logigramme 3 colonnes -->
+                            <div class="border rounded-4 bg-white p-2">
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0" id="proc2FlowTable">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:22%;">Qui ?</th>
+                                                <th style="width:40%;">Fait quoi ?</th>
+                                                <th style="width:38%;">Comment ?</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="proc2FlowBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="small text-muted mt-2">
+                                Les risques (R…) affichés sur les étapes sont cliquables : ouverture de la fiche Risque.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="tab-pane fade" id="tab-risques">
+                <div class="row g-3">
+                    <!-- Form -->
+                    <div class="col-12 col-xl-4">
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h2 class="h5 mb-0">Fiche risque</h2>
+                                <span class="pill">Score <span class="mono" id="scoreNow">9</span> · Niveau <span class="mono" id="levelNow">Significatif</span></span>
+                            </div>
+
+                            <div class="alert alert-light border py-2 mb-3">
+                                <div class="d-flex flex-wrap gap-3 align-items-center">
+                                    <div><span class="legend-dot dot-blue me-1"></span> Initial</div>
+                                    <div><span class="legend-dot dot-green me-1"></span> Résiduel (si contrôle effectif)</div>
+                                    <div class="small-muted">Cliquez une bulle ou un risque dans la liste pour charger la fiche.</div>
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <label class="form-label required">Code</label>
+                                    <input class="form-control" id="code" placeholder="R1">
+                                </div>
+                                <div class="col-8">
+                                    <label class="form-label required">Domaine</label>
+                                    <select class="form-select" id="domain">
+                                        <option>Classement</option>
+                                        <option>Conservation</option>
+                                        <option>RGPD</option>
+                                        <option>Vie scolaire</option>
+                                        <option>RH</option>
+                                        <option>Continuité</option>
+                                        <option>Audit</option>
+                                        <option>Sécurité</option>
+                                        <option>Organisation</option>
+                                        <option>Juridique</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label required">Intitulé du risque</label>
+                                    <input class="form-control" id="title" placeholder="Non-classement des courriels engageants">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Étape de procédure concernée</label>
+                                    <select class="form-select" id="step">
+                                        <option>Réception</option>
+                                        <option>Nécessité d’action / réponse</option>
+                                        <option>Attente</option>
+                                        <option>Traitement</option>
+                                        <option>Pièces jointes</option>
+                                        <option>Qualification administrative</option>
+                                        <option selected>Classement J+30</option>
+                                        <option>Archivage annuel</option>
+                                        <option>Transitoires</option>
+                                        <option>Données sensibles</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label required">Processus porteur du risque</label>
+                                    <select class="form-select" id="riskProcess">
+                                        <option value="">— Sélectionner —</option>
+                                    </select>
+                                    <div class="form-text">Le risque est rattaché à un processus ISO (ex : MPM01-001).</div>
+                                </div>
+
+
+                                <div class="col-6">
+                                    <label class="form-label required">Probabilité P (1–5)</label>
+                                    <input class="form-control" type="number" min="1" max="5" id="p" value="3">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label required">Impact I (1–5)</label>
+                                    <input class="form-control" type="number" min="1" max="5" id="i" value="3">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Justification (inspection / contexte)</label>
+                                    <textarea class="form-control" id="justif" rows="3" placeholder="Facteur humain, perte de preuve, non-conformité RGPD…"></textarea>
+                                </div>
+
+                                <hr class="my-2">
+
+                                <div class="col-12">
+                                    <h3 class="h6 mb-2">Mesure de contrôle (effet attendu)</h3>
+                                    <div class="small-muted mb-2">ΔP et ΔI s’appliquent uniquement si “Mise en œuvre = Oui”.</div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Libellé de la mesure</label>
+                                    <input class="form-control" id="controlName" placeholder="Revue mensuelle du classement à J+30 + rappel automatique">
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="controlKey">
+                                        <label class="form-check-label" for="controlKey">🔑 Contrôle clé</label>
+                                    </div>
+                                    <div class="form-text">Un contrôle clé est prioritaire dans le suivi et le plan de contrôle interne.</div>
+                                </div>
+
+                                <div class="col-6">
+                                    <label class="form-label">Responsable</label>
+                                    <input class="form-control" id="controlOwner" placeholder="Agent comptable / SGE / Chef cuisine…">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Fréquence</label>
+                                    <select class="form-select" id="controlFrequency">
+                                        <option value="">—</option>
+                                        <option>Quotidien</option>
+                                        <option>Hebdomadaire</option>
+                                        <option>Mensuel</option>
+                                        <option>Trimestriel</option>
+                                        <option>Annuel</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Preuve attendue</label>
+                                    <input class="form-control" id="controlEvidence" placeholder="Visa PJ / Fiche HACCP / Tableau habilitations…">
+                                </div>
+
+                                <div class="col-6">
+                                    <label class="form-label">ΔP (−4 à 0)</label>
+                                    <input class="form-control" type="number" min="-4" max="0" id="dP" value="-1">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">ΔI (−4 à 0)</label>
+                                    <input class="form-control" type="number" min="-4" max="0" id="dI" value="0">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Mise en œuvre</label>
+                                    <select class="form-select" id="controlImplemented">
+                                        <option value="no" selected>Non (prévisionnel)</option>
+                                        <option value="yes">Oui (effectif)</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2 mt-2">
+                                    <button class="btn btn-primary" id="btnSave">Enregistrer</button>
+                                    <button class="btn btn-outline-secondary" id="btnClear">Vider</button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Matrix + filter list -->
+                    <div class="col-12 col-xl-8" id="riskMatrixCol">
+
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                                <h2 class="h5 mb-0">Matrice des risques (P × I)</h2>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <span class="pill">Nb risques <span class="mono" id="countRisks">0</span></span>
+                                    <span class="pill">Critiques <span class="mono" id="countCrit">0</span></span>
+                                    <span class="pill">Élevés <span class="mono" id="countHigh">0</span></span>
+                                    <span class="pill">Affichés <span class="mono" id="countShown">0</span></span>
+                                </div>
+                            </div>
+                            <div class="row g-2 align-items-end mb-2">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1">Filtrer par processus</label>
+                                    <select class="form-select form-select-sm" id="matrixFilterProcess">
+                                        <option value="">— Tous les processus —</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1">Filtrer par procédure</label>
+                                    <select class="form-select form-select-sm" id="matrixFilterProcedure">
+                                        <option value="">— Toutes les procédures —</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4 d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-secondary" id="btnClearMatrixFilters">
+                                        Réinitialiser
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="matrix-area">
+                                <div class="matrix-wrap">
+                                    <div id="riskMatrixWrap">
+                                        <svg id="matrixOverlay"></svg>
+                                        <div class="matrix" id="matrix"></div>
+                                    </div>
+                                    <div class="small-muted mt-2">
+                                        Cliquez une bulle pour charger la fiche. Les risques affichés sont ceux cochés dans la liste à droite.
+                                    </div>
+                                </div>
+
+                                <div id="matrixSidePanel">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="fw-semibold">Filtre d’affichage</div>
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="filter buttons">
+                                            <button class="btn btn-outline-secondary" id="btnAll">Tout</button>
+                                            <button class="btn btn-outline-secondary" id="btnNone">Aucun</button>
+                                        </div>
+                                    </div>
+
+                                    <input class="form-control form-control-sm mb-2" id="filterSearch" placeholder="Rechercher dans la liste…">
+
+                                    <div class="risk-list" id="riskList"></div>
+
+                                    <div class="small-muted mt-2">
+                                        Coche = visible sur matrice. Clic sur le libellé = ouvrir la fiche à gauche.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Register -->
+                        <div class="card shadow-soft p-3 mt-3">
+                            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-2" id="riskRegisterCard">
+                                <h2 class="h5 mb-0">Registre</h2>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <input class="form-control" style="max-width:340px;" id="search" placeholder="Rechercher (code, domaine, texte)…">
+                                    <select class="form-select" style="max-width:220px;" id="filterLevel">
+                                        <option value="">Tous niveaux</option>
+                                        <option>Critique</option>
+                                        <option>Élevé</option>
+                                        <option>Significatif</option>
+                                        <option>Modéré</option>
+                                        <option>Faible</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Domaine</th>
+                                            <th>Risque</th>
+                                            <th class="nowrap">P×I</th>
+                                            <th>Niveau</th>
+                                            <th class="nowrap">Contrôle</th>
+                                            <th class="nowrap">Résiduel</th>
+                                            <th class="nowrap">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-control-plan">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <div>
+                                    <h2 class="h5 mb-1">Plan de contrôle interne (généré)</h2>
+                                    <div class="small-muted">Basé sur les risques, leur niveau et les contrôles (dont 🔑 contrôles clés).</div>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <select class="form-select form-select-sm" style="max-width:220px;" id="pciFilterOwner">
+                                        <option value="">— Tous responsables —</option>
+                                    </select>
+                                    <select class="form-select form-select-sm" style="max-width:220px;" id="pciFilterStatus">
+                                        <option value="">— Tous statuts —</option>
+                                        <option value="todo">À faire</option>
+                                        <option value="done">Réalisé</option>
+                                    </select>
+                                    <div class="form-check form-switch ms-2">
+                                        <input class="form-check-input" type="checkbox" id="pciOnlyKey">
+                                        <label class="form-check-label small-muted" for="pciOnlyKey">Uniquement contrôles clés</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Macroprocessus</th>
+                                            <th>Processus</th>
+                                            <th>Risque</th>
+                                            <th>Niveau</th>
+                                            <th>🔑</th>
+                                            <th>Contrôle</th>
+                                            <th>Responsable</th>
+                                            <th>Fréquence</th>
+                                            <th>Preuve attendue</th>
+                                            <th>État</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pciTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="card shadow-soft p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <h3 class="h6 mb-0">Vue opérationnelle (mode simplifié)</h3>
+                                <div class="small-muted">“Qu’est-ce que je dois contrôler, concrètement ?”</div>
+                            </div>
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Risque</th>
+                                            <th>Contrôle</th>
+                                            <th>Fréquence</th>
+                                            <th>Responsable</th>
+                                            <th>État</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="opsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal : suivi d'exécution / historisation -->
+            <div class="modal fade" id="controlRunModal" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">Suivi d’exécution du contrôle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <input type="hidden" id="crRiskId">
+
+                    <div class="row g-2 mb-2">
+                      <div class="col-12">
+                        <div class="small text-muted">Macroprocessus</div>
+                        <div class="fw-semibold" id="crMp">—</div>
+                      </div>
+                      <div class="col-12">
+                        <div class="small text-muted">Processus</div>
+                        <div class="fw-semibold" id="crProc">—</div>
+                      </div>
+                      <div class="col-12">
+                        <div class="small text-muted">Contrôle</div>
+                        <div class="fw-semibold" id="crControl">—</div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="small text-muted">Responsable</div>
+                        <div class="fw-semibold" id="crOwner">—</div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="small text-muted">Fréquence</div>
+                        <div class="fw-semibold" id="crFreq">—</div>
+                      </div>
+                      <div class="col-12">
+                        <div class="small text-muted">Preuve attendue</div>
+                        <div class="fw-semibold" id="crEvidenceExpected">—</div>
+                      </div>
+                    </div>
+
+                    <hr class="my-2">
+
+                    <div class="row g-2">
+                      <div class="col-md-4">
+                        <label class="form-label">Date d’exécution</label>
+                        <input type="date" class="form-control" id="crDate">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Statut</label>
+                        <select class="form-select" id="crStatus">
+                          <option value="done">Réalisé</option>
+                          <option value="todo">À faire</option>
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Preuve produite</label>
+                        <input class="form-control" id="crEvidenceDone" placeholder="Lien / référence / PJ…">
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label">Commentaire</label>
+                        <textarea class="form-control" id="crNote" rows="2" placeholder="Constat, écarts, actions correctives…"></textarea>
+                      </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <h6 class="mb-2">Historique</h6>
+                    <div class="table-responsive">
+                      <table class="table table-sm align-middle">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Statut</th>
+                            <th>Preuve produite</th>
+                            <th>Commentaire</th>
+                          </tr>
+                        </thead>
+                        <tbody id="crHistoryBody"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+                    <button type="button" class="btn btn-primary" id="btnCrSave">Enregistrer</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-domains">
+                <div class="row g-3">
+                    <!-- Synthèse globale -->
+                    <div class="col-12">
+                        <div class="card shadow-soft p-3">
+                            <h5 class="mb-2">Synthèse globale – Maîtrise des domaines</h5>
+                            <div class="row g-2" id="domainSummaryCards"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tableau détaillé -->
+                    <div class="col-12">
+                        <div class="card shadow-soft p-3">
+                            <h5 class="mb-2">Détail par domaine</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Domaine</th>
+                                            <th>Risques</th>
+                                            <th>Crit./Élevés</th>
+                                            <th>Maîtrisés</th>
+                                            <th>Taux</th>
+                                            <th>Niveau</th>
+                                            <th>Processus concernés</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="domainTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tab-mp-domains">
+                <div class="card shadow-soft p-3">
+                    <h5 class="mb-2">Vue Macroprocessus × Domaines</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle text-center">
+                            <thead>
+                                <tr id="mpDomainHeader"></tr>
+                            </thead>
+                            <tbody id="mpDomainBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        🟢 Maîtrisé · 🟡 À renforcer · 🔴 Faible
+                    </div>
+                </div>
+            </div>
+            <footer class="mt-5 text-center small-note">
+                <span id="app-version"> Version</span>
+            </footer>
+        </div>
+  <script>
+      /**
+       * M@TRISK - Pilotage des risques, des processus et de la conformité
+       *
+       * @version 0.1.2
+       * @author Yann Bogdanovic
+       * @description
+       *  - M@TRISK
+       * @changelog
+       *  v0.1.2
+       *    - Ajout historisation des controle du PDCI
+       */
+      const APP_VERSION = "M@TRISK - v0.1.0";
+      window.addEventListener("DOMContentLoaded", () => {
+          const el = document.getElementById("app-version");
+          if (el) el.textContent = APP_VERSION;
+      });
+
+      // Afficher le bouton PDF uniquement quand l'onglet "Maîtrise des domaines" est actif
+      function syncExportPdfVisibilityFromActiveTab() {
+          const btn = document.getElementById("btnExportPdf");
+          if (!btn) return;
+          const active = document.querySelector('#mainTabs .nav-link.active');
+          const target = active?.getAttribute("data-bs-target") || "";
+          btn.classList.toggle("d-none", target !== "#tab-domains");
+      }
+
+      // Bootstrap déclenche shown.bs.tab quand un onglet est réellement affiché
+      document.addEventListener("DOMContentLoaded", () => {
+          syncExportPdfVisibilityFromActiveTab();
+
+          const tabRoot = document.getElementById("mainTabs");
+          tabRoot?.addEventListener("shown.bs.tab", () => {
+              syncExportPdfVisibilityFromActiveTab();
+          });
+      });
+
+      const STORAGE_KEY = "eple_mail_controleinterne_v2";
+
+      function tagShapePoints(cx, cy, w, h, orientation) {
+          // Forme = rectangle + triangle (5 côtés)
+          // orientation: "down" | "right" | "up"
+
+          const left = cx - w / 2;
+          const right = cx + w / 2;
+          const top = cy - h / 2;
+          const bot = cy + h / 2;
+
+          const tri = Math.min(w, h) * 0.22; // taille de la pointe
+          //const inset = Math.min(w, h) * 0.10; // léger retrait pour l'esthétique
+
+          if (orientation === "down") {
+              // Rectangle + triangle bas
+              // Rectangle: (left, top) -> (right, top) -> (right, bot - tri) -> (left, bot - tri)
+              // Triangle: base sur y = bot - tri, pointe au centre bas
+              return [
+                  [left, top],
+                  [right, top],
+                  [right, bot - tri],
+                  [cx, bot], // pointe
+                  [left, bot - tri]
+              ];
+          }
+
+          if (orientation === "up") {
+              // Rectangle + triangle haut
+              return [
+                  [left, top + tri],
+                  [cx, top], // pointe
+                  [right, top + tri],
+                  [right, bot],
+                  [left, bot]
+              ];
+          }
+
+          // "right": Rectangle + triangle droite
+          return [
+              [left, top],
+              [right - tri, top],
+              [right, cy], // pointe
+              [right - tri, bot],
+              [left, bot]
+          ];
+      }
+
+      function ptsToString(pts) {
+          return pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+      }
+
+      function createMpTag(mp, type, COLORS) {
+          const w = 210,
+              h = 90;
+          const orientation = (type === "P") ? "down" : (type === "M") ? "right" : "up";
+
+          // Conteneur HTML (pour flex-wrap)
+          const wrap = document.createElement("div");
+          wrap.className = "mp-tag";
+          wrap.setAttribute("data-mp-id", mp.id);
+
+          // Mini-SVG autonome
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+          svg.setAttribute("width", "210");
+          svg.setAttribute("height", "90");
+          svg.setAttribute("role", "button");
+          svg.setAttribute("tabindex", "0");
+          svg.style.cursor = "pointer";
+
+          // Forme (points dans repère local)
+          const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+          poly.setAttribute("points", ptsToString(tagShapePoints(w / 2, h / 2, w, h, orientation)));
+          poly.setAttribute("fill", COLORS[type].fill);
+          poly.setAttribute("opacity", "0.92");
+          poly.setAttribute("class", "mp-shape");
+
+          // Textes
+          const t1 = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          t1.setAttribute("x", w / 2);
+          t1.setAttribute("y", 36);
+          t1.setAttribute("text-anchor", "middle");
+          t1.setAttribute("font-size", "18");
+          t1.setAttribute("font-weight", "800");
+          t1.setAttribute("fill", COLORS[type].text);
+          t1.textContent = mp.id;
+
+          const t2 = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          t2.setAttribute("x", w / 2);
+          t2.setAttribute("y", 60);
+          t2.setAttribute("text-anchor", "middle");
+          t2.setAttribute("font-size", "13");
+          t2.setAttribute("font-weight", "600");
+          t2.setAttribute("fill", COLORS[type].text);
+
+          const name = (mp.name || "").trim();
+          t2.textContent = name.length > 26 ? name.slice(0, 25) + "…" : name;
+
+          // Events (sur le svg : plus simple)
+          svg.addEventListener("click", () => {
+              if (typeof editMacroprocess === "function") editMacroprocess(mp.id);
+			  highlightMacroprocess(mp.id);
+          });
+
+          svg.addEventListener("dblclick", (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (typeof openProcessTabForMacroprocess === "function") openProcessTabForMacroprocess(mp.id);
+          });
+
+          // Accessibilité (Enter / Space)
+          svg.addEventListener("keydown", (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (typeof editMacroprocess === "function") editMacroprocess(mp.id);
+              }
+          });
+
+          svg.appendChild(poly);
+          svg.appendChild(t1);
+          svg.appendChild(t2);
+          wrap.appendChild(svg);
+          return wrap;
+      }
+
+      async function captureElementOffscreen(el, widthPx = 640, opts = {}) {
+          if (!el) return null;
+
+          const hideSelectors = Array.isArray(opts.hideSelectors) ? opts.hideSelectors : [];
+          const extraCss = typeof opts.extraCss === "string" ? opts.extraCss : "";
+
+          const clone = el.cloneNode(true);
+		  clone.classList.add("capture-root");
+          const holder = document.createElement("div");
+          holder.style.position = "fixed";
+          holder.style.left = "-10000px";
+          holder.style.top = "0";
+          holder.style.width = widthPx + "px";
+          holder.style.background = "#fff";
+          holder.style.padding = "12px";
+          holder.style.zIndex = "999999";
+
+          // Styles appliqués uniquement à la capture (clone offscreen)
+          if (hideSelectors.length || extraCss) {
+              const st = document.createElement("style");
+              st.textContent =
+                  hideSelectors.map(sel => `.capture-root ${sel}{display:none !important;}`).join("\n") +
+                  (extraCss ? `\n${extraCss}\n` : "");
+              holder.appendChild(st);
+          }
+
+          holder.appendChild(clone);
+          document.body.appendChild(holder);
+
+          await new Promise(requestAnimationFrame);
+
+          const canvas = await html2canvas(clone, {
+              backgroundColor: "#ffffff",
+              scale: 2,
+              useCORS: true
+          });
+
+          document.body.removeChild(holder);
+
+          // ✅ ICI on retourne la dataURL
+          return canvas.toDataURL("image/png");
+      }
+
+      function renderMacroprocessMap() {
+          const zoneP = $("mpZoneP");
+          const zoneM = $("mpZoneM");
+          const zoneS = $("mpZoneS");
+          if (!zoneP || !zoneM || !zoneS) return;
+
+          zoneP.innerHTML = "";
+          zoneM.innerHTML = "";
+          zoneS.innerHTML = "";
+
+          const all = (state.macroprocesses || []);
+          const pilotage = all.filter(x => x.type === "P");
+          const metier = all.filter(x => x.type === "M");
+          const support = all.filter(x => x.type === "S");
+
+          const COLORS = {
+              P: {
+                  fill: "#0d6efd",
+                  text: "#ffffff"
+              },
+              M: {
+                  fill: "#198754",
+                  text: "#ffffff"
+              },
+              S: {
+                  fill: "#fd7e14",
+                  text: "#1f2937"
+              }
+          };
+
+          // Append tags (flow layout géré par CSS flex-wrap)
+          pilotage.forEach(mp => zoneP.appendChild(createMpTag(mp, "P", COLORS)));
+          metier.forEach(mp => zoneM.appendChild(createMpTag(mp, "M", COLORS)));
+          support.forEach(mp => zoneS.appendChild(createMpTag(mp, "S", COLORS)));
+      }
+
+      function openProcessTabForMacroprocess(mpId) {
+          selectedMacroprocessForProcessTab = mpId;
+          openTab("tab-processus");
+
+          // pré-sélection du select (si présent) + rendu
+          const sel = $("procMpSelect");
+          if (sel) sel.value = mpId;
+
+          renderProcessTab();
+      }
+
+      function renderProcMpSelect() {
+          const sel = $("procMpSelect");
+          if (!sel) return;
+
+          const mps = (state.macroprocesses || []).slice().sort((a, b) => a.id.localeCompare(b.id));
+          sel.innerHTML = mps.map(mp => `<option value="${escapeHtml(mp.id)}">${escapeHtml(mp.id)} — ${escapeHtml(mp.name)}</option>`).join("");
+
+          // valeur par défaut
+          if (!selectedMacroprocessForProcessTab && mps.length) selectedMacroprocessForProcessTab = mps[0].id;
+          if (selectedMacroprocessForProcessTab) sel.value = selectedMacroprocessForProcessTab;
+
+          $("procMpBadge").textContent = selectedMacroprocessForProcessTab || "—";
+      }
+
+      function renderProcessList() {
+          const list = $("procList");
+          if (!list) return;
+
+          const mpId = $("procMpSelect")?.value || selectedMacroprocessForProcessTab;
+          selectedMacroprocessForProcessTab = mpId || selectedMacroprocessForProcessTab;
+          $("procMpBadge").textContent = selectedMacroprocessForProcessTab || "—";
+
+          const q = ($("procSearch")?.value || "").trim().toLowerCase();
+
+          const items = (state.processes || [])
+              .filter(p => p.macroprocessId === selectedMacroprocessForProcessTab)
+              .filter(p => {
+                  const hay = `${p.id} ${p.name}`.toLowerCase();
+                  return !q || hay.includes(q);
+              })
+              .sort((a, b) => a.id.localeCompare(b.id));
+
+          list.innerHTML = "";
+
+          items.forEach(p => {
+              const div = document.createElement("div");
+              div.className = "risk-item" + ((selectedProcessId === p.id) ? " selected" : "");
+              div.dataset.procId = p.id;
+
+              div.innerHTML = `
+		  <div class="meta">
+			<div class="d-flex align-items-center justify-content-between gap-2">
+			  <div class="title"><span class="mono">${escapeHtml(p.id)}</span> — ${escapeHtml(p.name)}</div>
+			  <span class="badge text-bg-secondary tag">Processus</span>
+			</div>
+			<div class="sub">${escapeHtml(p.pilot || "—")} · ${escapeHtml(p.purpose || "")}</div>
+		  </div>
+		`;
+
+              div.addEventListener("click", () => editProcess(p.id));
+              div.addEventListener("dblclick", (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openProceduresTabForProcess(p.id);
+              });
+
+              list.appendChild(div);
+          });
+      }
+
+      function countRisksForProcess(processId) {
+          return (state.risks || []).filter(r => r.processId === processId).length;
+      }
+
+      function renderProcessRiskCount(processId) {
+          const el = document.getElementById("procRiskCount");
+          if (!el) return;
+          el.textContent = processId ? String(countRisksForProcess(processId)) : "0";
+      }
+
+      function editProcess(id) {
+          const p = (state.processes || []).find(x => x.id === id);
+          if (!p) return;
+
+          selectedProcessId = id;
+          $("procCodeBadge").textContent = id;
+
+          // Charger champs
+          $("procId").value = p.id || "";
+          $("procName").value = p.name || "";
+          $("procPilot").value = p.pilot || "";
+          $("procPurpose").value = p.purpose || "";
+          $("procScope").value = p.scope || "";
+          $("procInputs").value = p.inputs || "";
+          $("procOutputs").value = p.outputs || "";
+          $("procResources").value = p.resources || "";
+          $("procInteractions").value = p.interactions || "";
+          $("procKpi").value = p.kpi || "";
+          $("procRisks").value = p.risks || "";
+          $("procDocs").value = p.docs || "";
+
+          renderProcessList();
+          renderProcessRisks(id);
+          renderProcessRiskCount(id);
+      }
+
+      function clearProcessForm() {
+          selectedProcessId = null;
+          $("procCodeBadge").textContent = "—";
+          ["procId", "procName", "procPilot", "procPurpose", "procScope", "procInputs", "procOutputs", "procResources", "procInteractions", "procKpi", "procRisks", "procDocs"]
+          .forEach(id => {
+              const el = $(id);
+              if (el) el.value = "";
+          });
+          renderProcessList();
+          renderProcessRiskCount(null);
+
+          $("processRiskTable").innerHTML = "";
+      }
+
+      function newProcess() {
+          // propose un code auto MPPxx-001
+          const mpId = $("procMpSelect")?.value || selectedMacroprocessForProcessTab || "";
+          const prefix = `${mpId}-`;
+          const nums = (state.processes || [])
+              .filter(p => p.id?.startsWith(prefix))
+              .map(p => parseInt((p.id.split("-")[1] || "0"), 10))
+              .filter(n => !Number.isNaN(n));
+          const next = String((nums.length ? Math.max(...nums) + 1 : 1)).padStart(3, "0");
+
+          clearProcessForm();
+          $("procId").value = `${mpId}-${next}`;
+          $("procName").focus();
+      }
+
+      function upsertProcessFromForm() {
+          const mpId = $("procMpSelect")?.value || selectedMacroprocessForProcessTab;
+          if (!mpId) {
+              alert("Sélectionnez un macroprocessus.");
+              return;
+          }
+
+          const id = ($("procId").value || "").trim().toUpperCase();
+          const name = ($("procName").value || "").trim();
+          if (!id || !name) {
+              alert("Code et nom du processus requis.");
+              return;
+          }
+
+          const obj = {
+              id,
+              macroprocessId: mpId,
+              name,
+              pilot: ($("procPilot").value || "").trim(),
+              purpose: ($("procPurpose").value || "").trim(),
+              scope: ($("procScope").value || "").trim(),
+              inputs: ($("procInputs").value || "").trim(),
+              outputs: ($("procOutputs").value || "").trim(),
+              resources: ($("procResources").value || "").trim(),
+              interactions: ($("procInteractions").value || "").trim(),
+              kpi: ($("procKpi").value || "").trim(),
+              risks: ($("procRisks").value || "").trim(),
+              docs: ($("procDocs").value || "").trim()
+          };
+
+          const idx = state.processes.findIndex(p => p.id === id);
+          if (idx >= 0) state.processes[idx] = obj;
+          else state.processes.push(obj);
+
+          saveState();
+          selectedProcessId = id;
+          $("procCodeBadge").textContent = id;
+
+          renderProcessTab();
+      }
+
+      function deleteProcess() {
+          if (!selectedProcessId) return;
+          if (!confirm(`Supprimer ${selectedProcessId} ?`)) return;
+          state.processes = (state.processes || []).filter(p => p.id !== selectedProcessId);
+          saveState();
+          clearProcessForm();
+          renderProcessTab();
+      }
+
+      function renderProcessTab() {
+          renderProcMpSelect();
+          renderProcessList();
+
+          // si un processus est sélectionné mais ne correspond plus au MP, on nettoie
+          if (selectedProcessId) {
+              const p = (state.processes || []).find(x => x.id === selectedProcessId);
+              if (!p || p.macroprocessId !== selectedMacroprocessForProcessTab) clearProcessForm();
+          }
+      }
+
+      function openProceduresTabForProcess(processId) {
+          // mémorise le filtre de l'onglet procédures
+          selectedProcessForProceduresTab = processId;
+
+          // ouvre l'onglet
+          openTab("tab-procedures");
+
+          // positionne le select (si déjà rendu)
+          const sel = document.getElementById("proc2ProcessSelect");
+          if (sel) sel.value = processId;
+
+          // rendu onglet procédures
+          //renderProceduresTab?.();
+
+          // Si une seule procédure existe pour ce processus => l'ouvrir directement
+          const procs = (state.procedures || []).filter(p => p.processId === processId);
+          if (procs.length === 1) {
+              editProcedure(procs[0].id);
+          } else {
+              // sinon on laisse la liste filtrée et la fiche vide
+              //clearProcedureForm?.();
+          }
+      }
+
+      function renderProcessRisks(processId) {
+          const c = $("processRiskTable");
+          if (!c || !processId) return;
+
+          const risks = (state.risks || [])
+              .map(computeRisk)
+              .filter(r => r.processId === processId);
+
+          if (risks.length === 0) {
+              c.innerHTML = `<div class="text-muted">Aucun risque rattaché à ce processus.</div>`;
+              return;
+          }
+
+          c.innerHTML = `
+		<div class="table-responsive">
+		  <table class="table table-sm align-middle">
+			<thead>
+			  <tr>
+				<th>Risque</th>
+				<th>Score initial</th>
+				<th>Niveau</th>
+				<th>Mesure de contrôle</th>
+				<th>Score résiduel</th>
+				<th>Statut</th>
+			  </tr>
+			</thead>
+			<tbody>
+			  ${risks.map(r => `
+				<tr>
+				  <td>
+					<div class="fw-semibold">${r.id} – ${r.title}</div>
+				  </td>
+				  <td class="mono">${r.score}</td>
+				  <td>${r.level}</td>
+				  <td>${r.control?.name || "—"}</td>
+				  <td class="mono">
+					${r.control?.implemented ? r.scoreRes : "—"}
+				  </td>
+				  <td>
+					${riskStatusBadge(r)}
+				  </td>
+				</tr>
+			  `).join("")}
+			</tbody>
+		  </table>
+		</div>
+	  `;
+      }
+
+      function riskStatusBadge(r) {
+          if (!r.control || !r.control.name)
+              return `<span class="badge text-bg-secondary">Non maîtrisé</span>`;
+
+          if (!r.control.implemented)
+              return `<span class="badge text-bg-warning">Contrôle prévu</span>`;
+
+          if (r.scoreRes <= 7)
+              return `<span class="badge text-bg-success">Maîtrisé</span>`;
+
+          return `<span class="badge text-bg-danger">À renforcer</span>`;
+      }
+
+
+      // ====== Procédures Tab State ======
+
+
+      // Remplit le select Processus (onglet Procédures)
+      function renderProc2ProcessSelect() {
+          const sel = $("proc2ProcessSelect");
+          if (!sel) return;
+
+          const procs = (state.processes || []).slice().sort((a, b) => a.id.localeCompare(b.id));
+          sel.innerHTML = procs.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.id)} — ${escapeHtml(p.name)}</option>`).join("");
+
+          if (!selectedProcessForProceduresTab && procs.length) selectedProcessForProceduresTab = procs[0].id;
+          if (selectedProcessForProceduresTab) sel.value = selectedProcessForProceduresTab;
+
+          $("proc2ProcessBadge").textContent = selectedProcessForProceduresTab || "—";
+      }
+
+      // Liste des procédures du processus sélectionné
+      function renderProcedureList() {
+          const list = $("proc2List");
+          if (!list) return;
+
+          const pid = $("proc2ProcessSelect")?.value || selectedProcessForProceduresTab;
+          selectedProcessForProceduresTab = pid;
+          $("proc2ProcessBadge").textContent = pid || "—";
+
+          const q = ($("proc2Search")?.value || "").trim().toLowerCase();
+
+          const items = (state.procedures || [])
+              .filter(pr => pr.processId === pid)
+              .filter(pr => {
+                  const hay = `${pr.id} ${pr.name} ${pr.version || ""}`.toLowerCase();
+                  return !q || hay.includes(q);
+              })
+              .sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+
+          list.innerHTML = "";
+          items.forEach(pr => {
+              const div = document.createElement("div");
+              div.className = "risk-item" + ((selectedProcedureId === pr.id) ? " selected" : "");
+              div.dataset.procedureId = pr.id;
+              div.innerHTML = `
+		  <div class="meta">
+			<div class="d-flex align-items-center justify-content-between gap-2">
+			  <div class="title"><span class="mono">${escapeHtml(pr.id)}</span> — ${escapeHtml(pr.name)}</div>
+			  <span class="badge text-bg-secondary tag">${escapeHtml(pr.version || "—")}</span>
+			</div>
+			<div class="sub">${escapeHtml(pid)} · ${escapeHtml((pr.steps?.length || 0) + " étape(s)")}</div>
+		  </div>
+		`;
+              div.addEventListener("click", () => editProcedure(pr.id));
+              list.appendChild(div);
+          });
+      }
+
+      // Charge une procédure dans la fiche + rend étapes + logigramme
+      function editProcedure(id) {
+          const pr = (state.procedures || []).find(x => x.id === id);
+          if (!pr) return;
+
+          selectedProcedureId = id;
+          $("proc2Badge").textContent = id;
+
+          $("proc2Id").value = pr.id || "";
+          $("proc2Name").value = pr.name || "";
+          $("proc2Version").value = pr.version || "";
+
+          renderStepsEditor(pr);
+          renderFlow(pr);
+
+          renderProcedureList();
+      }
+
+      // Vide la fiche
+      function clearProcedureForm() {
+          selectedProcedureId = null;
+          lastContext = null;
+          renderRiskReturnButton();
+          $("proc2Badge").textContent = "—";
+          ["proc2Id", "proc2Name", "proc2Version"].forEach(id => $(id).value = "");
+          $("proc2StepsEditor").innerHTML = "";
+          $("proc2FlowBody").innerHTML = "";
+          renderProcedureList();
+      }
+
+      // Nouvelle procédure
+      function newProcedure() {
+          clearProcedureForm();
+          const pid = selectedProcessForProceduresTab || $("proc2ProcessSelect")?.value || "";
+          $("proc2Id").value = `PROC-${pid.replaceAll("-","")}-001`.toUpperCase();
+          $("proc2Name").focus();
+      }
+
+      // Enregistrer procédure (create/update)
+      function upsertProcedureFromForm() {
+          const pid = $("proc2ProcessSelect")?.value || selectedProcessForProceduresTab;
+          if (!pid) {
+              alert("Sélectionnez un processus.");
+              return;
+          }
+
+          const id = ($("proc2Id").value || "").trim().toUpperCase();
+          const name = ($("proc2Name").value || "").trim();
+          if (!id || !name) {
+              alert("ID et Nom requis.");
+              return;
+          }
+
+          // Récupère étapes depuis l’éditeur
+          const steps = readStepsEditor();
+
+          const pr = {
+              id,
+              processId: pid,
+              name,
+              version: ($("proc2Version").value || "").trim(),
+              steps
+          };
+
+          const idx = state.procedures.findIndex(x => x.id === id);
+          if (idx >= 0) state.procedures[idx] = pr;
+          else state.procedures.push(pr);
+
+          saveState();
+          selectedProcedureId = id;
+          $("proc2Badge").textContent = id;
+
+          renderProcedureList();
+          renderStepsEditor(pr);
+          renderFlow(pr);
+      }
+
+      // Supprimer
+      function deleteProcedure() {
+          if (!selectedProcedureId) return;
+          if (!confirm(`Supprimer ${selectedProcedureId} ?`)) return;
+          state.procedures = (state.procedures || []).filter(p => p.id !== selectedProcedureId);
+          saveState();
+          clearProcedureForm();
+      }
+
+      // ====== Steps editor (simple) ======
+      function renderStepsEditor(pr) {
+          const c = $("proc2StepsEditor");
+          if (!c) return;
+          const steps = pr.steps || [];
+
+          c.innerHTML = `
+		<div class="d-flex align-items-center justify-content-between mb-2">
+		  <div class="fw-semibold">Étapes (édition)</div>
+		  <div class="small text-muted">Renseigner Qui / Fait quoi / Comment + risques (R1,R2…)</div>
+		</div>
+		${steps.map((s, idx) => `
+		  <div class="step-card mb-2" data-step-index="${idx}">
+			<div class="row g-2">
+			  <div class="col-md-3">
+				<label class="form-label mb-1">Qui ?</label>
+				<input class="form-control form-control-sm step-who" value="${escapeHtml(s.who || "")}">
+			  </div>
+			  <div class="col-md-5">
+				<label class="form-label mb-1">Fait quoi ?</label>
+				<input class="form-control form-control-sm step-what" value="${escapeHtml(s.what || "")}">
+			  </div>
+			  <div class="col-md-4">
+				<label class="form-label mb-1">Comment ?</label>
+				<input class="form-control form-control-sm step-how" value="${escapeHtml(s.how || "")}">
+			  </div>
+
+			  <div class="col-12">
+				<label class="form-label mb-1">Risques (IDs séparés par virgules)</label>
+				<input class="form-control form-control-sm step-risks" value="${escapeHtml((s.riskIds || []).join(","))}" placeholder="R1,R7,R9">
+			  </div>
+
+			  <div class="col-12 step-actions d-flex gap-2">
+				<button type="button" class="btn btn-sm btn-outline-secondary" data-move-up="${idx}">↑</button>
+				<button type="button" class="btn btn-sm btn-outline-secondary" data-move-down="${idx}">↓</button>
+				<button type="button" class="btn btn-sm btn-outline-danger ms-auto" data-delete-step="${idx}">Suppr.</button>
+			  </div>
+			</div>
+		  </div>
+		`).join("")}
+	  `;
+
+          // Bind buttons
+          c.querySelectorAll("[data-delete-step]").forEach(btn => {
+              btn.addEventListener("click", () => {
+                  const i = parseInt(btn.dataset.deleteStep, 10);
+                  const steps = readStepsEditor();
+                  steps.splice(i, 1);
+                  pr.steps = steps;
+                  renderStepsEditor(pr);
+                  renderFlow(pr);
+              });
+          });
+
+          c.querySelectorAll("[data-move-up]").forEach(btn => {
+              btn.addEventListener("click", () => {
+                  const i = parseInt(btn.dataset.moveUp, 10);
+                  const steps = readStepsEditor();
+                  if (i <= 0) return;
+                  [steps[i - 1], steps[i]] = [steps[i], steps[i - 1]];
+                  pr.steps = steps;
+                  renderStepsEditor(pr);
+                  renderFlow(pr);
+              });
+          });
+
+          c.querySelectorAll("[data-move-down]").forEach(btn => {
+              btn.addEventListener("click", () => {
+                  const i = parseInt(btn.dataset.moveDown, 10);
+                  const steps = readStepsEditor();
+                  if (i >= steps.length - 1) return;
+                  [steps[i], steps[i + 1]] = [steps[i + 1], steps[i]];
+                  pr.steps = steps;
+                  renderStepsEditor(pr);
+                  renderFlow(pr);
+              });
+          });
+      }
+
+      function readStepsEditor() {
+          const c = $("proc2StepsEditor");
+          if (!c) return [];
+          const cards = Array.from(c.querySelectorAll(".step-card"));
+          return cards.map(card => {
+              const who = card.querySelector(".step-who")?.value || "";
+              const what = card.querySelector(".step-what")?.value || "";
+              const how = card.querySelector(".step-how")?.value || "";
+              const risksRaw = card.querySelector(".step-risks")?.value || "";
+              const riskIds = risksRaw.split(",").map(x => x.trim().toUpperCase()).filter(Boolean);
+              return {
+                  who,
+                  what,
+                  how,
+                  riskIds
+              };
+          });
+      }
+
+      // Ajouter une étape
+      function addStep() {
+          const id = ($("proc2Id").value || "").trim().toUpperCase();
+          if (!id) {
+              alert("Créez/enregistrez d’abord une procédure (ID).");
+              return;
+          }
+
+          const pr = (state.procedures || []).find(x => x.id === id) || {
+              id,
+              processId: selectedProcessForProceduresTab,
+              name: $("proc2Name").value || "",
+              version: $("proc2Version").value || "",
+              steps: []
+          };
+
+          pr.steps = pr.steps || [];
+          pr.steps.push({
+              who: "",
+              what: "",
+              how: "",
+              riskIds: []
+          });
+
+          renderStepsEditor(pr);
+          renderFlow(pr);
+      }
+
+      // ====== Logigramme 3 colonnes ======
+      function renderFlow(pr) {
+          const tb = $("proc2FlowBody");
+          if (!tb) return;
+
+          const steps = pr.steps || [];
+          tb.innerHTML = "";
+
+          steps.forEach((s, idx) => {
+              const tr = document.createElement("tr");
+
+              const isLast = idx === steps.length - 1;
+
+              const risks = (s.riskIds || []).map(rid => {
+                  return `<span class="badge text-bg-warning me-1 risk-badge" data-risk="${escapeHtml(rid)}">${escapeHtml(rid)}</span>`;
+              }).join("");
+
+              tr.innerHTML = `
+		  <td class="flow-step ${isLast ? "flow-last" : ""}">
+			<div class="step-card">
+			  ${escapeHtml(s.who || "—")}
+			</div>
+		  </td>
+		  <td class="flow-step ${isLast ? "flow-last" : ""}">
+			<div class="step-card">
+			  <div class="fw-semibold">${escapeHtml(s.what || "—")}</div>
+			  <div class="mt-1">${risks ? `<div class="small text-muted mb-1">Risques :</div>${risks}` : `<span class="text-muted small">—</span>`}</div>
+			</div>
+		  </td>
+		  <td class="flow-step ${isLast ? "flow-last" : ""}">
+			<div class="step-card">
+			  ${escapeHtml(s.how || "—")}
+			</div>
+		  </td>
+		`;
+
+              tb.appendChild(tr);
+          });
+
+          // Bind clic risque => ouvrir fiche risque
+          tb.querySelectorAll("[data-risk]").forEach(b => {
+              const riskId = b.getAttribute("data-risk");
+
+              // clic simple : édition locale
+              b.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                  if (typeof editRisk === "function") editRisk(riskId);
+              });
+
+              // double clic : bascule onglet Risques + mémorise contexte
+              b.addEventListener("dblclick", (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  lastContext = {
+                      fromTab: "tab-procedures",
+                      procedureId: selectedProcedureId,
+                      processId: selectedProcessForProceduresTab
+                  };
+
+                  openTab("tab-risques");
+
+                  setTimeout(() => {
+                      if (typeof editRisk === "function") editRisk(riskId);
+                      renderRiskReturnButton();
+                  }, 50);
+              });
+          });
+
+
+      }
+
+      // Rendu global de l’onglet Procédures
+      function renderProceduresTab() {
+          renderProc2ProcessSelect();
+          renderProcedureList();
+      }
+
+
+
+
+      // Matrice
+      const LEVELS = [{
+          min: 20,
+          max: 25,
+          label: "Critique"
+      },
+      {
+          min: 15,
+          max: 19,
+          label: "Élevé"
+      },
+      {
+          min: 8,
+          max: 14,
+          label: "Significatif"
+      },
+      {
+          min: 4,
+          max: 7,
+          label: "Modéré"
+      },
+      {
+          min: 1,
+          max: 3,
+          label: "Faible"
+      }];
+
+      const IMPACT_LABELS = ["Très faible", "Faible", "Moyenne", "Élevée", "Très élevée"]; // I=1..5
+      const PROBA_LABELS = ["Très faible", "Faible", "Moyenne", "Élevée", "Très élevée"]; // P=1..5
+
+      const $ = (id) => document.getElementById(id);
+
+      // UI state
+      let lastContext = null;
+      let selectedRiskId = null; // currently opened in form
+
+      function clampInt(v, min, max) {
+          let n = parseInt(v, 10);
+          if (Number.isNaN(n)) n = min;
+          return Math.max(min, Math.min(max, n));
+      }
+
+      function levelFromScore(score) {
+          const hit = LEVELS.find(l => score >= l.min && score <= l.max);
+          return hit ? hit.label : "—";
+      }
+
+      function heatClass(score) {
+          if (score >= 20) return "heat-r";
+          if (score >= 15) return "heat-o";
+          if (score >= 8) return "heat-y";
+          return "heat-g";
+      }
+
+      function escapeHtml(s) {
+          return (s ?? "").toString()
+              .replaceAll("&", "&amp;")
+              .replaceAll("<", "&lt;")
+              .replaceAll(">", "&gt;")
+              .replaceAll('"', "&quot;")
+              .replaceAll("'", "&#039;");
+      }
+
+      function seedRisks() {
+          return [{
+              id: "R1",
+              domain: "Classement",
+              title: "Non-classement des courriels engageants",
+              step: "Classement J+30",
+              p: 5,
+              i: 4,
+              processId: "MPM01-001",
+              justification: "Risque fréquent (facteur humain), perte de preuve administrative",
+              control: {
+                  name: "Revue mensuelle + rappel J+21",
+                  dP: -1,
+                  dI: 0,
+                  implemented: true
+              },
+              visible: true
+          },
+          {
+              id: "R2",
+              domain: "Conservation",
+              title: "Suppression prématurée d’un courriel probant",
+              step: "Transitoires",
+              p: 3,
+              i: 5,
+              processId: "MPM01-001",
+              justification: "Suppression possible, impact juridique majeur",
+              control: {
+                  name: "Règle de conservation + check trimestriel",
+                  dP: -1,
+                  dI: 0,
+                  implemented: false
+              },
+              visible: true
+          },
+          {
+              id: "R3",
+              domain: "RGPD",
+              title: "Conservation excessive de données personnelles",
+              step: "Archivage annuel",
+              p: 4,
+              i: 4,
+              processId: "MPM01-001",
+              justification: "Pratique courante, non-conformité RGPD",
+              control: {
+                  name: "Purge annuelle + registre durées",
+                  dP: -1,
+                  dI: -1,
+                  implemented: false
+              },
+              visible: true
+          },
+          {
+              id: "R4",
+              domain: "Vie scolaire",
+              title: "Divulgation de données sensibles élèves",
+              step: "Données sensibles",
+              p: 3,
+              i: 5,
+              processId: "MPM01-001",
+              justification: "Données mineurs, impact RGPD maximal",
+              control: {
+                  name: "Accès restreint + sensibilisation + chiffrement PJ",
+                  dP: -1,
+                  dI: -1,
+                  implemented: false
+              },
+              visible: true
+          },
+          {
+              id: "R5",
+              domain: "RH",
+              title: "Accès non autorisé à des données RH",
+              step: "Données sensibles",
+              p: 3,
+              i: 5,
+              processId: "MPM01-001",
+              justification: "Données sensibles agents, responsabilité CE",
+              control: {
+                  name: "Dossiers RH séparés + droits + revue accès",
+                  dP: -1,
+                  dI: -1,
+                  implemented: false
+              },
+              visible: true
+          },
+          {
+              id: "R6",
+              domain: "Continuité",
+              title: "Perte d’informations lors d’un changement d’agent",
+              step: "Traitement",
+              p: 3,
+              i: 4,
+              processId: "MPM01-001",
+              justification: "Dépendance à l’agent, désorganisation",
+              control: {
+                  name: "Boîte fonctionnelle + passation + procédure",
+                  dP: -1,
+                  dI: 0,
+                  implemented: false
+              },
+              visible: true
+          },
+          {
+              id: "R7",
+              domain: "Audit",
+              title: "Impossibilité de produire une preuve",
+              step: "Qualification administrative",
+              p: 2,
+              i: 5,
+              processId: "MPM01-001",
+              justification: "Faible fréquence, impact fort en contrôle",
+              control: {
+                  name: "Indexation + stockage PJ en espace partagé",
+                  dP: 0,
+                  dI: -1,
+                  implemented: false
+              },
+              visible: true
+          },
+          {
+              id: "R8",
+              domain: "Sécurité",
+              title: "Synchronisation non maîtrisée (cloud, perso)",
+              step: "Données sensibles",
+              p: 2,
+              i: 5,
+              processId: "MPM01-001",
+              justification: "Pratique marginale mais risque RGPD élevé",
+              control: {
+                  name: "Blocage sync perso + charte + contrôle poste",
+                  dP: -1,
+                  dI: -1,
+                  implemented: false
+              },
+              visible: true
+          },
+          {
+              id: "R9",
+              domain: "Organisation",
+              title: "Classement hétérogène selon les agents",
+              step: "Classement J+30",
+              p: 4,
+              i: 3,
+              processId: "MPM01-001",
+              justification: "Pratique courante, impact organisationnel",
+              control: {
+                  name: "Plan de classement unique + audit mensuel",
+                  dP: -1,
+                  dI: 0,
+                  implemented: false
+              },
+              visible: true
+          },
+          {
+              id: "R10",
+              domain: "Juridique",
+              title: "Conservation d’emails informels sans valeur",
+              step: "Archivage annuel",
+              p: 5,
+              i: 2,
+              processId: "MPM01-001",
+              justification: "Très fréquent, impact limité mais réel",
+              control: {
+                  name: "Règles tri + modèle de rédaction",
+                  dP: -1,
+                  dI: 0,
+                  implemented: false
+              },
+              visible: true
+          }, ];
+      }
+
+      function renderRiskProcessSelect(selectedValue = "") {
+          const sel = $("riskProcess");
+          if (!sel) return;
+
+          const procs = (state.processes || [])
+              .slice()
+              .sort((a, b) => a.id.localeCompare(b.id));
+
+          sel.innerHTML =
+              `<option value="">— Sélectionner —</option>` +
+              procs.map(p => {
+                  const label = `${p.id} — ${p.name}`;
+                  return `<option value="${escapeHtml(p.id)}">${escapeHtml(label)}</option>`;
+              }).join("");
+
+          sel.value = selectedValue || "";
+      }
+
+      function renderRiskReturnButton() {
+          const btn = document.getElementById("btnBackToProcedure");
+          if (!btn) return;
+
+          if (lastContext && lastContext.fromTab === "tab-procedures") {
+              btn.classList.remove("d-none");
+          } else {
+              btn.classList.add("d-none");
+          }
+      }
+
+
+      function computeRisk(r) {
+          const p = clampInt(r.p, 1, 5);
+          const i = clampInt(r.i, 1, 5);
+          const score = p * i;
+          const level = levelFromScore(score);
+
+          let pRes = p,
+              iRes = i,
+              scoreRes = score,
+              levelRes = level;
+          const ctrl = r.control || null;
+
+          if (ctrl && ctrl.implemented) {
+              const dP = clampInt(ctrl.dP ?? 0, -4, 0);
+              const dI = clampInt(ctrl.dI ?? 0, -4, 0);
+              pRes = clampInt(p + dP, 1, 5);
+              iRes = clampInt(i + dI, 1, 5);
+              scoreRes = pRes * iRes;
+              levelRes = levelFromScore(scoreRes);
+          }
+
+          return {
+              ...r,
+              p,
+              i,
+              score,
+              level,
+              pRes,
+              iRes,
+              scoreRes,
+              levelRes
+          };
+      }
+
+      function sortRisks() {
+          state.risks = state.risks
+              .map(computeRisk)
+              .sort((a, b) => (b.score - a.score) || a.id.localeCompare(b.id));
+      }
+
+      function ensureMatrixOverlaySized() {
+          const wrap = document.getElementById("riskMatrixWrap");
+          const svg = document.getElementById("matrixOverlay");
+          if (!wrap || !svg) return;
+
+          const r = wrap.getBoundingClientRect();
+          svg.setAttribute("width", r.width);
+          svg.setAttribute("height", r.height);
+          svg.setAttribute("viewBox", `0 0 ${r.width} ${r.height}`);
+      }
+
+      function centerRelativeTo(el, container) {
+          const a = el.getBoundingClientRect();
+          const c = container.getBoundingClientRect();
+          return {
+              x: (a.left - c.left) + a.width / 2,
+              y: (a.top - c.top) + a.height / 2
+          };
+      }
+
+      function drawRightAngleArrow(svg, x1, y1, x2, y2) {
+          // dernier segment horizontal -> pointe orientée vers la bulle
+          const elbowX = x2;
+          const elbowY = y1;
+
+          const ns = "http://www.w3.org/2000/svg";
+          const path = document.createElementNS(ns, "path");
+          path.setAttribute("d", `M ${x2} ${y2} L ${elbowX} ${elbowY} L ${x1} ${y1}`);
+          path.setAttribute("fill", "none");
+          path.setAttribute("stroke", "rgba(13,110,253,.85)");
+          path.setAttribute("stroke-width", "2");
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("stroke-linejoin", "round");
+          path.setAttribute("marker-end", "url(#arrowHead)");
+          svg.appendChild(path);
+      }
+
+      function renderMitigationArrows() {
+          const wrap = document.getElementById("riskMatrixWrap");
+          const matrix = document.getElementById("matrix");
+          const svg = document.getElementById("matrixOverlay");
+          if (!wrap || !matrix || !svg) return;
+
+          // dimensionner l’overlay
+          const r = wrap.getBoundingClientRect();
+          svg.setAttribute("width", r.width);
+          svg.setAttribute("height", r.height);
+          svg.setAttribute("viewBox", `0 0 ${r.width} ${r.height}`);
+          svg.innerHTML = "";
+
+          // defs flèche
+          const ns = "http://www.w3.org/2000/svg";
+          const defs = document.createElementNS(ns, "defs");
+          defs.innerHTML = `
+		<marker id="arrowHead"
+				markerWidth="6" markerHeight="6"
+				refX="5.2" refY="3"
+				orient="auto"
+				markerUnits="strokeWidht">
+		  <path d="M 0 0 L 6 3 L 0 6 z"
+				fill="rgba(13,110,253,.85)"></path>
+		</marker>`;
+          svg.appendChild(defs);
+
+          // récupérer toutes les bulles (dans #matrix)
+          const nodes = matrix.querySelectorAll("[data-risk-id][data-point]");
+
+          // indexer par risque + type
+          const byRisk = {};
+          nodes.forEach(el => {
+              const id = String(el.dataset.riskId || "").toUpperCase();
+              const pt = String(el.dataset.point || "").toLowerCase();
+              if (!id || !pt) return;
+              byRisk[id] ??= {};
+              byRisk[id][pt] = el;
+          });
+
+          // tracer inherent -> residual
+          Object.entries(byRisk).forEach(([id, o]) => {
+              if (!o.inherent || !o.residual) return;
+
+              const p1 = centerRelativeTo(o.inherent, wrap);
+              const p2 = centerRelativeTo(o.residual, wrap);
+
+              drawRightAngleArrow(
+                  svg,
+                  p1.x + 12, p1.y,
+                  p2.x - 12, p2.y
+              );
+          });
+      }
+
+      function normalizePointType(v) {
+          v = String(v || "").toLowerCase().trim();
+          if (v === "intrinsic") return "inherent";
+          return v;
+      }
+
+      function loadState() {
+          try {
+              const raw = localStorage.getItem(STORAGE_KEY);
+              if (!raw) return {
+                  risks: seedRisks(),
+				  controlRuns: []
+              };
+              const parsed = JSON.parse(raw);
+              if (!parsed || !Array.isArray(parsed.risks)) return {
+                  risks: seedRisks(),
+				  controlRuns: []
+              };
+
+              // Backward compat: ensure visible flag exists
+              parsed.risks = parsed.risks.map(r => ({
+                  visible: true,
+                  ...r,
+                  control: {
+                      name: r.control?.name || "",
+                      dP: (r.control?.dP ?? -1),
+                      dI: (r.control?.dI ?? 0),
+                      implemented: !!r.control?.implemented,
+                      key: !!r.control?.key,
+                      owner: r.control?.owner || "",
+                      frequency: r.control?.frequency || "",
+                      evidence: r.control?.evidence || ""
+                  }
+              }));
+              // Backward compat: suivi d'exécution des contrôles
+              if (!Array.isArray(parsed.controlRuns)) parsed.controlRuns = [];
+              return parsed;
+          } catch (e) {
+              return {
+                  risks: seedRisks(),
+				  controlRuns: []
+              };
+          }
+      }
+
+      function saveState() {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state, null, 2));
+      }
+
+      function recalcForm() {
+          const p = clampInt($("p").value, 1, 5);
+          const i = clampInt($("i").value, 1, 5);
+          $("p").value = p;
+          $("i").value = i;
+          const score = p * i;
+          $("scoreNow").textContent = score;
+          $("levelNow").textContent = levelFromScore(score);
+      }
+
+      function clearForm() {
+          selectedRiskId = null;
+          $("code").value = "";
+          $("domain").value = "Classement";
+          $("title").value = "";
+          $("step").value = "Classement J+30";
+          $("p").value = 3;
+          $("i").value = 3;
+          $("justif").value = "";
+          $("controlName").value = "";
+          $("controlKey").checked = false;
+          $("controlOwner").value = "";
+          $("controlFrequency").value = "";
+          $("controlEvidence").value = "";
+          $("dP").value = -1;
+          $("dI").value = 0;
+          $("controlImplemented").value = "no";
+          recalcForm();
+          highlightSelectedInList();
+          renderRiskProcessSelect("");
+          renderRiskReturnButton();
+      }
+
+      function upsertRiskFromForm() {
+          const id = ($("code").value || "").trim().toUpperCase();
+          processId: ($("riskProcess")?.value || null);
+
+          if (!/^R\d+$/i.test(id)) {
+              alert("Code requis au format R1, R2, …");
+              return;
+          }
+
+          // Preserve existing visibility when editing
+          const existing = state.risks.find(x => x.id === id);
+
+          const r = {
+              id,
+              domain: $("domain").value,
+              title: ($("title").value || "").trim() || "(Sans titre)",
+              step: $("step").value,
+              p: clampInt($("p").value, 1, 5),
+              i: clampInt($("i").value, 1, 5),
+              processId: ($("riskProcess")?.value || "").trim(),
+              justification: ($("justif").value || "").trim(),
+              control: {
+                  name: ($("controlName").value || "").trim(),
+                  key: !!$("controlKey").checked,
+                  owner: ($("controlOwner").value || "").trim(),
+                  frequency: ($("controlFrequency").value || "").trim(),
+                  evidence: ($("controlEvidence").value || "").trim(),
+                  dP: clampInt($("dP").value, -4, 0),
+                  dI: clampInt($("dI").value, -4, 0),
+                  implemented: $("controlImplemented").value === "yes"
+              },
+              visible: existing ? !!existing.visible : true
+          };
+
+          const idx = state.risks.findIndex(x => x.id === id);
+          if (idx >= 0) state.risks[idx] = r;
+          else state.risks.push(r);
+
+          sortRisks();
+          saveState();
+          selectedRiskId = id;
+          renderAll();
+      }
+
+      function editRisk(id) {
+          const r0 = state.risks.find(x => x.id === id);
+          if (!r0) return;
+          const r = computeRisk(r0);
+
+          selectedRiskId = r.id;
+
+          $("code").value = r.id;
+          $("domain").value = r.domain;
+          $("title").value = r.title;
+          $("step").value = r.step || "Classement J+30";
+          $("p").value = r.p;
+          $("i").value = r.i;
+          $("justif").value = r.justification || "";
+
+          $("controlName").value = r.control?.name || "";
+          $("controlKey").checked = !!r.control?.key;
+          $("controlOwner").value = r.control?.owner || "";
+          $("controlFrequency").value = r.control?.frequency || "";
+          $("controlEvidence").value = r.control?.evidence || "";
+          $("dP").value = r.control?.dP ?? -1;
+          $("dI").value = r.control?.dI ?? 0;
+          $("controlImplemented").value = (r.control?.implemented ? "yes" : "no");
+
+          $("riskProcess").value = r.processId || "";
+
+          renderRiskProcessSelect(r.processId || "");
+          renderRiskReturnButton();
+          recalcForm();
+          highlightSelectedInList();
+          window.scrollTo({
+              top: 0,
+              behavior: "smooth"
+          });
+      }
+
+      function deleteRisk(id) {
+          if (!confirm(`Supprimer ${id} ?`)) return;
+          state.risks = state.risks.filter(r => r.id !== id);
+          if (selectedRiskId === id) selectedRiskId = null;
+          sortRisks();
+          saveState();
+          renderAll();
+          clearForm();
+      }
+
+      function openRisksTab() {
+          openTab("tab-risques"); // cohérent avec data-bs-target="#tab-risques"
+      }
+
+
+      // Matrix -------------------------------------------------------
+      function cellKey(p, i) {
+          return `p${p}_i${i}`;
+      }
+
+      function buildMatrixSkeleton() {
+          const m = $("matrix");
+          m.innerHTML = "";
+
+          const tl = document.createElement("div");
+          tl.className = "m-head";
+          tl.textContent = "";
+          m.appendChild(tl);
+
+          for (let i = 1; i <= 5; i++) {
+              const h = document.createElement("div");
+              h.className = "m-head";
+              h.textContent = IMPACT_LABELS[i - 1];
+              m.appendChild(h);
+          }
+
+          for (let p = 5; p >= 1; p--) {
+              const side = document.createElement("div");
+              side.className = "m-side";
+              side.innerHTML = `<div><div class="fw-semibold">${PROBA_LABELS[p-1]}</div><div class="small-muted">P=${p}</div></div>`;
+              m.appendChild(side);
+
+              for (let i = 1; i <= 5; i++) {
+                  const score = p * i;
+                  const c = document.createElement("div");
+                  c.className = `cell ${heatClass(score)}`;
+                  c.dataset.key = cellKey(p, i);
+                  c.innerHTML = `<div class="score">${score}</div>`;
+                  m.appendChild(c);
+              }
+          }
+      }
+
+      function clearMatrixMarkers() {
+          document.querySelectorAll(".cell .marker").forEach(el => el.remove());
+      }
+
+      function placeMarker(cell, kind, riskId, tooltip, same = false) {
+          isResidual = "inherent" == kind
+          const d = document.createElement("div");
+          d.className = `marker ${kind}` + (same ? " same" : "");
+          d.title = tooltip;
+          d.textContent = riskId;
+          d.dataset.riskId = riskId;
+          d.dataset.point = isResidual ? "residual" : "inherent";
+
+          // Click bubble => open risk in left form
+          d.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              editRisk(riskId);
+          });
+
+          cell.appendChild(d);
+      }
+
+      function renderMatrix() {
+          buildMatrixSkeleton();
+          clearMatrixMarkers();
+
+          const computed = state.risks.map(computeRisk);
+
+          let shown = computed.filter(r => r.visible !== false);
+
+          // === FILTRES PROCESSUS / PROCEDURE ===
+          const fp = document.getElementById("matrixFilterProcess")?.value || "";
+          const fpr = document.getElementById("matrixFilterProcedure")?.value || "";
+
+          // Filtre par procédure
+          if (fpr) {
+              const allowed = getRiskIdsForProcedure(fpr).map(normalizeRiskId);
+              const allowedSet = new Set(allowed);
+
+              // Si procédure sélectionnée mais 0 risques référencés => on NE filtre PAS (sinon tout disparaît)
+              if (allowedSet.size > 0) {
+                  shown = shown.filter(r => allowedSet.has(normalizeRiskId(r.id)));
+              } else {
+                  console.warn("[MATRIX] Procédure sélectionnée mais aucun riskId trouvé :", fpr);
+              }
+          }
+
+          $("countShown").textContent = shown.length;
+
+          shown.forEach(r => {
+              const cellInh = document.querySelector(`.cell[data-key="${cellKey(r.p, r.i)}"]`);
+              if (!cellInh) return;
+
+              const showResidual = (r.control && r.control.implemented);
+
+              const tooltipBase = `${r.id} – ${r.title}\nInitial: P=${r.p} I=${r.i} Score=${r.score} (${r.level})`;
+
+              if (!showResidual) {
+                  placeMarker(cellInh, "inherent", r.id, tooltipBase + `\nRésiduel: — (contrôle non effectif)`, true);
+                  return;
+              }
+
+              const cellRes = document.querySelector(`.cell[data-key="${cellKey(r.pRes, r.iRes)}"]`);
+              if (!cellRes) {
+                  placeMarker(cellInh, "inherent", r.id, tooltipBase, true);
+                  return;
+              }
+
+              const sameCell = (r.p === r.pRes) && (r.i === r.iRes);
+              if (sameCell) {
+                  placeMarker(cellInh, "inherent", r.id, tooltipBase + `\nRésiduel: inchangé`, true);
+              } else {
+                  placeMarker(cellInh, "inherent", r.id, tooltipBase + `\nRésiduel: P=${r.pRes} I=${r.iRes} Score=${r.scoreRes} (${r.levelRes})`, false);
+                  placeMarker(cellRes, "residual", r.id, tooltipBase + `\nRésiduel: P=${r.pRes} I=${r.iRes} Score=${r.scoreRes} (${r.levelRes})`, false);
+              }
+          });
+
+          requestAnimationFrame(renderMitigationArrows);
+      }
+      window.addEventListener("resize", () =>
+          requestAnimationFrame(renderMitigationArrows)
+      );
+
+      function renderMatrixProcessFilter() {
+          const sel = document.getElementById("matrixFilterProcess");
+          if (!sel) return;
+
+          const procs = (state.processes || [])
+              .slice()
+              .sort((a, b) => a.id.localeCompare(b.id));
+
+          sel.innerHTML =
+              `<option value="">— Tous les processus —</option>` +
+              procs.map(p =>
+                  `<option value="${p.id}">${p.id} — ${p.name}</option>`
+              ).join("");
+      }
+
+      function renderMatrixProcedureFilter() {
+          const sel = document.getElementById("matrixFilterProcedure");
+          if (!sel) return;
+
+          const procs = (state.procedures || [])
+              .slice()
+              .sort((a, b) => a.id.localeCompare(b.id));
+
+          sel.innerHTML =
+              `<option value="">— Toutes les procédures —</option>` +
+              procs.map(p =>
+                  `<option value="${p.id}">${p.id} — ${p.name}</option>`
+              ).join("");
+      }
+
+      function normalizeRiskId(x) {
+          return String(x || "").trim().toUpperCase();
+      }
+
+      function getRiskIdsForProcedure(procedureId) {
+          const pr = (state.procedures || []).find(p => String(p.id) === String(procedureId));
+          if (!pr || !Array.isArray(pr.steps)) return [];
+
+          const ids = new Set();
+
+          pr.steps.forEach(s => {
+              // 1) cas normal : riskIds = ["R1","R2"]
+              if (Array.isArray(s.riskIds)) {
+                  s.riskIds.forEach(rid => {
+                      const n = normalizeRiskId(rid);
+                      if (n) ids.add(n);
+                  });
+                  return;
+              }
+
+              // 2) cas fréquent : riskIds = "R1,R2"
+              if (typeof s.riskIds === "string") {
+                  s.riskIds.split(",").forEach(rid => {
+                      const n = normalizeRiskId(rid);
+                      if (n) ids.add(n);
+                  });
+                  return;
+              }
+
+              // 3) cas fallback : champ unique riskId
+              if (s.riskId) {
+                  const n = normalizeRiskId(s.riskId);
+                  if (n) ids.add(n);
+              }
+          });
+
+          return Array.from(ids);
+      }
+
+      // ===== Plan de contrôle interne (PCI) ========================
+      function getMacroprocessIdForProcess(processId) {
+          const p = (state.processes || []).find(x => String(x.id) === String(processId));
+          return p?.macroprocessId || "";
+      }
+      function getMacroprocessLabel(mpId) {
+          const mp = (state.macroprocesses || []).find(x => String(x.id) === String(mpId));
+          return mp ? `${mp.id} — ${mp.name}` : (mpId || "—");
+      }
+      function getProcessLabel(processId) {
+          const p = (state.processes || []).find(x => String(x.id) === String(processId));
+          return p ? `${p.id} — ${p.name}` : (processId || "—");
+      }
+
+      // ---- Historisation exécution contrôles ----------------------
+      function todayIso() {
+          const d = new Date();
+          const pad = (n) => String(n).padStart(2, "0");
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      }
+
+      function toDateSafe(isoYmd) {
+          if (!isoYmd) return null;
+          const d = new Date(String(isoYmd) + "T00:00:00");
+          return Number.isNaN(d.getTime()) ? null : d;
+      }
+
+      function isoWeekKey(d) {
+          // ISO week: Thursday in current week decides the year.
+          const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+          const dayNum = date.getUTCDay() || 7;
+          date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+          const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+          return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+      }
+
+      function quarterKey(d) {
+          const q = Math.floor(d.getMonth() / 3) + 1;
+          return `${d.getFullYear()}-Q${q}`;
+      }
+
+      function isRunCurrentForFrequency(runIso, frequency) {
+          const runD = toDateSafe(runIso);
+          if (!runD) return false;
+          const now = new Date();
+          const freq = String(frequency || "").trim().toLowerCase();
+
+          if (freq === "quotidien") {
+              return runIso === todayIso();
+          }
+          if (freq === "hebdomadaire") {
+              return isoWeekKey(runD) === isoWeekKey(now);
+          }
+          if (freq === "mensuel") {
+              return runD.getFullYear() === now.getFullYear() && runD.getMonth() === now.getMonth();
+          }
+          if (freq === "trimestriel") {
+              return quarterKey(runD) === quarterKey(now);
+          }
+          if (freq === "annuel") {
+              return runD.getFullYear() === now.getFullYear();
+          }
+          // fréquence vide / autre => on considère "valide" si un run existe
+          return true;
+      }
+
+      function getControlRunsForRisk(riskId) {
+          const rid = String(riskId || "").toUpperCase();
+          return (state.controlRuns || [])
+              .filter(x => String(x.riskId || "").toUpperCase() === rid)
+              .slice()
+              .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+      }
+
+      function getLatestControlRunForRisk(riskId) {
+          const runs = getControlRunsForRisk(riskId);
+          return runs.length ? runs[0] : null;
+      }
+
+      function riskControlStatus(r) {
+          // prérequis : contrôle défini + effectif
+          if (!r.control || !(r.control.name || "").trim()) return "todo";
+          if (!r.control.implemented) return "todo";
+
+          // statut basé sur la dernière exécution historisée
+          const last = getLatestControlRunForRisk(r.id);
+          if (!last || last.status !== "done") return "todo";
+          return isRunCurrentForFrequency(last.date, r.control.frequency) ? "done" : "todo";
+      }
+      function generateControlPlan() {
+          const computed = (state.risks || []).map(computeRisk);
+          const plan = computed
+              .filter(r => r.visible !== false)
+              .filter(r => {
+                  const isHigh = (r.level === "Critique" || r.level === "Élevé");
+                  const isKey = !!r.control?.key;
+                  return isHigh || isKey;
+              })
+              .map(r => {
+                  const mpId = getMacroprocessIdForProcess(r.processId);
+                  return {
+                      mpId,
+                      mpLabel: getMacroprocessLabel(mpId),
+                      processId: r.processId,
+                      processLabel: getProcessLabel(r.processId),
+                      riskId: r.id,
+                      riskTitle: r.title,
+                      level: r.level,
+                      key: !!r.control?.key,
+                      controlName: (r.control?.name || "").trim() || "—",
+                      owner: (r.control?.owner || "").trim() || "—",
+                      frequency: (r.control?.frequency || "").trim() || "—",
+                      evidence: (r.control?.evidence || "").trim() || "—",
+                      status: riskControlStatus(r)
+                  };
+              })
+              .sort((a, b) => {
+                  const order = { "Critique": 3, "Élevé": 2, "Significatif": 1, "Modéré": 0, "Faible": -1 };
+                  return (order[b.level] - order[a.level]) || a.riskId.localeCompare(b.riskId);
+              });
+          return plan;
+      }
+
+      function renderPciFilters(plan) {
+          const selOwner = document.getElementById("pciFilterOwner");
+          if (selOwner) {
+              const owners = Array.from(new Set(plan.map(x => x.owner).filter(x => x && x !== "—"))).sort();
+              const cur = selOwner.value || "";
+              selOwner.innerHTML = `<option value="">— Tous responsables —</option>` + owners.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+              selOwner.value = cur;
+          }
+      }
+
+      function renderControlPlan() {
+          const tb = document.getElementById("pciTableBody");
+          const tbOps = document.getElementById("opsTableBody");
+          if (!tb || !tbOps) return;
+
+          const plan = generateControlPlan();
+          renderPciFilters(plan);
+
+          const fOwner = document.getElementById("pciFilterOwner")?.value || "";
+          const fStatus = document.getElementById("pciFilterStatus")?.value || "";
+          const onlyKey = !!document.getElementById("pciOnlyKey")?.checked;
+
+          const filtered = plan.filter(x => {
+              if (onlyKey && !x.key) return false;
+              if (fOwner && x.owner !== fOwner) return false;
+              if (fStatus && x.status !== fStatus) return false;
+              return true;
+          });
+
+          tb.innerHTML = "";
+          filtered.forEach(x => {
+              const tr = document.createElement("tr");
+              tr.dataset.mpId = x.mpId || "";
+              tr.dataset.procId = x.processId || "";
+              tr.dataset.riskId = x.riskId || "";
+              tr.innerHTML = `
+                  <td class="pci-mp">${escapeHtml(x.mpLabel)}</td>
+                  <td class="pci-proc">${escapeHtml(x.processLabel)}</td>
+                  <td class="pci-risk">
+                    <div class="fw-semibold">${escapeHtml(x.riskId)} — ${escapeHtml(x.riskTitle)}</div>
+                  </td>
+                  <td><span class="badge ${badgeClass(x.level)}">${escapeHtml(x.level)}</span></td>
+                  <td class="text-center">${x.key ? "✅" : "—"}</td>
+                  <td>${escapeHtml(x.controlName)}</td>
+                  <td>${escapeHtml(x.owner)}</td>
+                  <td>${escapeHtml(x.frequency)}</td>
+                  <td>${escapeHtml(x.evidence)}</td>
+                  <td class="nowrap">
+                    ${x.status === "done"
+                      ? `<span class="badge text-bg-success">Réalisé</span>`
+                      : `<span class="badge text-bg-warning">À faire</span>`
+                    }
+                    <div class="btn-group btn-group-sm ms-2" role="group">
+                      <button type="button"
+                              class="btn btn-outline-success"
+                              data-pci-action="run"
+                              ${x.controlName === "—" ? "disabled" : ""}>
+                        ✓
+                      </button>
+                      <button type="button"
+                              class="btn btn-outline-secondary"
+                              data-pci-action="history"
+                              ${x.controlName === "—" ? "disabled" : ""}>
+                        🕘
+                      </button>
+                    </div>
+                  </td>
+              `;
+              tb.appendChild(tr);
+          });
+
+          // Vue opérationnelle : uniquement "À faire", triée avec contrôles clés en premier
+          const ops = plan
+              .filter(x => x.status === "todo")
+              .sort((a, b) => (Number(b.key) - Number(a.key)) || a.riskId.localeCompare(b.riskId));
+
+          tbOps.innerHTML = "";
+          ops.forEach(x => {
+              const tr = document.createElement("tr");
+              tr.dataset.riskId = x.riskId || "";
+              tr.innerHTML = `
+                  <td class="ops-risk"><div class="fw-semibold">${escapeHtml(x.riskId)} — ${escapeHtml(x.riskTitle)}</div></td>
+                  <td>${escapeHtml(x.controlName)} ${x.key ? `<span class="badge text-bg-primary ms-1">clé</span>` : ""}</td>
+                  <td>${escapeHtml(x.frequency)}</td>
+                  <td>${escapeHtml(x.owner)}</td>
+                  <td class="nowrap">
+                    <span class="badge text-bg-warning">À faire</span>
+                    <div class="btn-group btn-group-sm ms-2" role="group">
+                      <button type="button"
+                              class="btn btn-outline-success"
+                              data-ops-action="run"
+                              ${x.controlName === "—" ? "disabled" : ""}>
+                        ✓
+                      </button>
+                      <button type="button"
+                              class="btn btn-outline-secondary"
+                              data-ops-action="history"
+                              ${x.controlName === "—" ? "disabled" : ""}>
+                        🕘
+                      </button>
+                    </div>
+                  </td>
+              `;
+              tbOps.appendChild(tr);
+          });
+
+          // Bind actions (délégation, 1 seule fois)
+          bindControlRunActions();
+      }
+
+      // ---- UI + actions suivi d'exécution -------------------------
+      let controlRunActionsBound = false;
+      function bindControlRunActions() {
+          if (controlRunActionsBound) return;
+          const tb = document.getElementById("pciTableBody");
+          const tbOps = document.getElementById("opsTableBody");
+          if (!tb || !tbOps) return;
+
+          const openModal = (riskId) => {
+              const rid = String(riskId || "").toUpperCase();
+              const plan = generateControlPlan();
+              const item = plan.find(x => String(x.riskId || "").toUpperCase() === rid);
+              if (!item) return;
+
+              document.getElementById("crRiskId").value = item.riskId || "";
+              document.getElementById("crMp").textContent = item.mpLabel || "—";
+              document.getElementById("crProc").textContent = item.processLabel || "—";
+              document.getElementById("crControl").textContent = item.controlName || "—";
+              document.getElementById("crOwner").textContent = item.owner || "—";
+              document.getElementById("crFreq").textContent = item.frequency || "—";
+              document.getElementById("crEvidenceExpected").textContent = item.evidence || "—";
+
+              document.getElementById("crDate").value = todayIso();
+              document.getElementById("crStatus").value = "done";
+              document.getElementById("crEvidenceDone").value = "";
+              document.getElementById("crNote").value = "";
+
+              // table historique
+              const runs = getControlRunsForRisk(item.riskId);
+              const tbody = document.getElementById("crHistoryBody");
+              tbody.innerHTML = runs.length ? runs.map(r => `
+                <tr>
+                  <td class="mono">${escapeHtml(r.date || "—")}</td>
+                  <td>${r.status === "done"
+                        ? `<span class="badge text-bg-success">Réalisé</span>`
+                        : `<span class="badge text-bg-warning">À faire</span>`}</td>
+                  <td>${escapeHtml(r.evidenceDone || "—")}</td>
+                  <td>${escapeHtml(r.note || "")}</td>
+                </tr>
+              `).join("") : `<tr><td colspan="4" class="text-muted">Aucune exécution historisée.</td></tr>`;
+
+              const modalEl = document.getElementById("controlRunModal");
+              const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+              modal.show();
+          };
+
+          const quickRun = (riskId) => {
+              const rid = String(riskId || "").toUpperCase();
+              const plan = generateControlPlan();
+              const item = plan.find(x => String(x.riskId || "").toUpperCase() === rid);
+              if (!item) return;
+
+              // enregistre une exécution "Réalisé" à la date du jour
+              state.controlRuns ??= [];
+              state.controlRuns.push({
+                  riskId: item.riskId,
+                  processId: item.processId || "",
+                  mpId: item.mpId || "",
+                  controlName: item.controlName || "",
+                  owner: item.owner || "",
+                  frequency: item.frequency || "",
+                  evidenceExpected: item.evidence || "",
+                  status: "done",
+                  date: todayIso(),
+                  evidenceDone: "",
+                  note: ""
+              });
+              saveState();
+              renderControlPlan();
+          };
+
+          tb.addEventListener("click", (e) => {
+              const btn = e.target.closest("[data-pci-action]");
+              if (!btn) return;
+              const tr = btn.closest("tr");
+              const riskId = tr?.dataset?.riskId;
+              if (!riskId) return;
+              e.preventDefault();
+              const a = btn.dataset.pciAction;
+              if (a === "run") quickRun(riskId);
+              if (a === "history") openModal(riskId);
+          });
+
+          tbOps.addEventListener("click", (e) => {
+              const btn = e.target.closest("[data-ops-action]");
+              if (!btn) return;
+             const tr = btn.closest("tr");
+              const riskId = tr?.dataset?.riskId;
+              if (!riskId) return;
+              e.preventDefault();
+              const a = btn.dataset.opsAction;
+              if (a === "run") quickRun(riskId);
+              if (a === "history") openModal(riskId);
+          });
+
+          // save modal form
+          document.getElementById("btnCrSave")?.addEventListener("click", () => {
+              const riskId = (document.getElementById("crRiskId").value || "").trim().toUpperCase();
+              if (!riskId) return;
+              const date = (document.getElementById("crDate").value || "").trim();
+              const status = (document.getElementById("crStatus").value || "done").trim();
+              const evidenceDone = (document.getElementById("crEvidenceDone").value || "").trim();
+              const note = (document.getElementById("crNote").value || "").trim();
+
+              const plan = generateControlPlan();
+              const item = plan.find(x => String(x.riskId || "").toUpperCase() === riskId);
+              if (!item) return;
+
+              state.controlRuns ??= [];
+              state.controlRuns.push({
+                  riskId: item.riskId,
+                  processId: item.processId || "",
+                  mpId: item.mpId || "",
+                  controlName: item.controlName || "",
+                  owner: item.owner || "",
+                  frequency: item.frequency || "",
+                  evidenceExpected: item.evidence || "",
+                  status,
+                  date: date || todayIso(),
+                  evidenceDone,
+                  note
+              });
+              saveState();
+              bootstrap.Modal.getOrCreateInstance(document.getElementById("controlRunModal")).hide();
+              renderControlPlan();
+          });
+
+          controlRunActionsBound = true;
+      }
+
+      function highlightMacroprocess(mpId) {
+          document.querySelectorAll(".mp-tag").forEach(el => {
+              el.classList.toggle("selected", el.dataset.mpId === mpId);
+          });
+      }
+
+      // Double-clics PCI : navigation contextuelle
+/*      let pciDblClicksBound = false;
+      function bindPciDblClicks() {
+          if (pciDblClicksBound) return;
+
+          const tb = document.getElementById("pciTableBody");
+          const tbOps = document.getElementById("opsTableBody");
+          if (!tb || !tbOps) return;
+
+          // Plan de contrôle interne (généré)
+          tb.addEventListener("dblclick", (e) => {
+              const td = e.target?.closest?.("td");
+              const tr = e.target?.closest?.("tr");
+              if (!td || !tr) return;
+
+              // Macroprocessus => onglet Macroprocessus + fiche
+              if (td.classList.contains("pci-mp") && tr.dataset.mpId) {
+                  e.preventDefault();
+                  openTab("tab-macroprocessus");
+
+                  if (typeof editMacroprocess === "function") {
+                      editMacroprocess(tr.dataset.mpId);
+                  }
+				  
+                  // Synchronise aussi l'onglet Processus (colonne gauche) pour éviter toute incohérence
+                  // (le select existe même si l'onglet n'est pas actif)
+                  selectedMacroprocessForProcessTab = tr.dataset.mpId;
+                  const procSel = document.getElementById("procMpSelect");
+                  if (procSel) procSel.value = tr.dataset.mpId;
+                  const procBadge = document.getElementById("procMpBadge");
+                  if (procBadge) procBadge.textContent = tr.dataset.mpId;
+
+                  // surbrillance cartographie
+                  setTimeout(() => {
+                      highlightMacroprocess(tr.dataset.mpId);
+                  }, 50);
+                  return;
+              }
+
+              // Processus => onglet Processus + fiche
+              if (td.classList.contains("pci-proc") && tr.dataset.procId) {
+                  e.preventDefault();
+                  openTab("tab-processus");
+                  if (typeof editProcess === "function") editProcess(tr.dataset.procId);
+              openTab("tab-processus");
+
+              // 🔎 Récupération du processus pour connaître son macroprocessus
+              const proc = (state.processes || []).find(p => p.id === tr.dataset.procId);
+              if (proc?.macroprocessId) {
+                  // synchronise le macroprocessus dans la colonne gauche
+                  selectedMacroprocessForProcessTab = proc.macroprocessId;
+                  const sel = document.getElementById("procMpSelect");
+                  if (sel) sel.value = proc.macroprocessId;
+              }
+
+              // rendu cohérent de la liste + chargement fiche
+              renderProcessTab();
+              if (typeof editProcess === "function") editProcess(tr.dataset.procId);
+                  return;
+              }
+
+              // Risque => onglet Risques + fiche
+              if (td.classList.contains("pci-risk") && tr.dataset.riskId) {
+                  e.preventDefault();
+                  openTab("tab-risques");
+                  setTimeout(() => {
+                      if (typeof editRisk === "function") editRisk(tr.dataset.riskId);
+                  }, 50);
+              }
+          });
+
+          // Vue opérationnelle (mode simplifié) : double-clic => fiche du risque
+          tbOps.addEventListener("dblclick", (e) => {
+              const td = e.target?.closest?.("td");
+              const tr = e.target?.closest?.("tr");
+              if (!td || !tr) return;
+              if (!td.classList.contains("ops-risk")) return;
+              if (!tr.dataset.riskId) return;
+
+              e.preventDefault();
+              openTab("tab-risques");
+              setTimeout(() => {
+                  if (typeof editRisk === "function") editRisk(tr.dataset.riskId);
+              }, 50);
+          });
+
+          pciDblClicksBound = true;
+      }
+*/
+      // ===== Mode simplifié ========================================
+      function applySimpleModeUI() {
+          const on = !!document.getElementById("toggleSimpleMode")?.checked;
+
+          // ✅ On garde la matrice visible (colonne principale), mais on masque ce qui surcharge :
+          // - panneau latéral (liste des risques + filtres d'affichage)
+          // - registre (tableau)
+          const side = document.getElementById("matrixSidePanel");
+          if (side) side.classList.toggle("d-none", on);
+
+          const reg = document.getElementById("riskRegisterCard");
+          if (reg) reg.classList.toggle("d-none", on);
+
+          // Optionnel : masquer aussi la ligne de filtres processus/procédure au-dessus de la matrice
+          // (si tu veux la conserver en mode simplifié, supprime les 3 lignes ci-dessous)
+          const filterRow = document.getElementById("matrixFilterProcess")?.closest(".row");
+          if (filterRow) filterRow.classList.toggle("d-none", on);
+
+          // Comme la taille de la matrice change (panneau latéral masqué), on resynchronise l'overlay SVG
+          if (typeof ensureMatrixOverlaySized === "function") {
+              requestAnimationFrame(() => ensureMatrixOverlaySized());
+          }
+      }
+
+      let selectedMacroprocessId = null;
+
+      function mpTypeLabel(t) {
+          return t === "P" ? "Pilotage" : (t === "M" ? "Métier" : (t === "S" ? "Support" : "—"));
+      }
+
+      function editMacroprocess(id) {
+          const mp = (state.macroprocesses || []).find(x => x.id === id);
+          if (!mp) return;
+
+          selectedMacroprocessId = id;
+
+          // Remplir le formulaire à gauche
+          $("mpType").value = mp.type || "P";
+          $("mpCode").value = mp.id || "";
+          $("mpName").value = mp.name || "";
+          $("mpOwner").value = mp.owner || "";
+          const obj = $("mpObjectives");
+          if (obj) obj.value = mp.objectives || "";
+
+          highlightSelectedMPRow();
+          // Option : remonter en haut de page (comme risques)
+          window.scrollTo({
+              top: 0,
+              behavior: "smooth"
+          });
+      }
+
+      function clearMPForm() {
+          selectedMacroprocessId = null;
+          $("mpType").value = "P";
+          $("mpCode").value = "";
+          $("mpName").value = "";
+          $("mpOwner").value = "";
+          const obj = $("mpObjectives");
+          if (obj) obj.value = "";
+          highlightSelectedMPRow();
+      }
+
+      function upsertMacroprocessFromForm() {
+          const id = ($("mpCode").value || "").trim().toUpperCase();
+          const type = $("mpType").value;
+          const name = ($("mpName").value || "").trim();
+          const owner = ($("mpOwner").value || "").trim();
+          const objectives = ($("mpObjectives")?.value || "").trim();
+
+          if (!id || !/^MP[PM S]\d{2}$/i.test(id.replace(" ", ""))) {
+              // tolérance : vous utilisez MPP01 / MPM01 / MPS01
+              // Donc pattern accepté : MP(P|M|S)\d{2}
+              // Si vous préférez strictement MPPxx etc, dites-moi, je verrouille.
+              // On fait ici permissif.
+          }
+          if (!id.startsWith("MP")) {
+              alert("Code macroprocessus attendu (ex: MPP01, MPM01, MPS01).");
+              return;
+          }
+          if (!name) {
+              alert("Nom requis.");
+              return;
+          }
+
+          if (!state.macroprocesses) state.macroprocesses = [];
+
+          const idx = state.macroprocesses.findIndex(x => x.id === id);
+          const mp = {
+              id,
+              type,
+              name,
+              owner,
+              objectives
+          };
+
+          if (idx >= 0) state.macroprocesses[idx] = mp;
+          else state.macroprocesses.push(mp);
+
+          saveState();
+          selectedMacroprocessId = id;
+
+          renderMacroprocessMap();
+          renderMacroprocessList();
+      }
+
+      function highlightSelectedMPRow() {
+          document.querySelectorAll("#mpTbody tr").forEach(tr => {
+              tr.classList.toggle("mp-row-selected", selectedMacroprocessId && tr.dataset.mpId === selectedMacroprocessId);
+          });
+      }
+
+      function renderMacroprocessList() {
+          const tb = $("mpTbody");
+          if (!tb) return;
+
+          const q = ($("mpSearch")?.value || "").trim().toLowerCase();
+
+          const items = (state.macroprocesses || [])
+              .slice()
+              .sort((a, b) => a.id.localeCompare(b.id))
+              .filter(mp => {
+                  const hay = `${mp.id} ${mp.type} ${mpTypeLabel(mp.type)} ${mp.name} ${mp.owner || ""}`.toLowerCase();
+                  return !q || hay.includes(q);
+              });
+
+          tb.innerHTML = "";
+
+          items.forEach(mp => {
+              const tr = document.createElement("tr");
+              tr.dataset.mpId = mp.id;
+
+              tr.innerHTML = `
+		  <td class="mono fw-semibold">${escapeHtml(mp.id)}</td>
+		  <td>${escapeHtml(mpTypeLabel(mp.type))}</td>
+		  <td>${escapeHtml(mp.name)}</td>
+		  <td>${escapeHtml(mp.owner || "—")}</td>
+		  <td class="nowrap">
+			<button class="btn btn-sm btn-outline-primary" data-edit-mp="${escapeHtml(mp.id)}">Éditer</button>
+		  </td>
+		`;
+
+              // clic sur la ligne => ouvrir la fiche
+              tr.addEventListener("click", (e) => {
+                  // éviter double déclenchement quand on clique le bouton
+                  if (e.target?.closest("button")) return;
+                  editMacroprocess(mp.id);
+              });
+
+              tb.appendChild(tr);
+          });
+
+          tb.querySelectorAll("button[data-edit-mp]").forEach(btn => {
+              btn.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                  editMacroprocess(btn.getAttribute("data-edit-mp"));
+              });
+          });
+
+          highlightSelectedMPRow();
+      }
+
+      // processes
+      let selectedProcessId = null;
+      let selectedMacroprocessForProcessTab = null;
+
+      // Filter list (right) ------------------------------------------
+      function badgeClass(level) {
+          switch (level) {
+              case "Critique":
+                  return "text-bg-danger";
+              case "Élevé":
+                  return "text-bg-warning";
+              case "Significatif":
+                  return "text-bg-primary";
+              case "Modéré":
+                  return "text-bg-info";
+              case "Faible":
+                  return "text-bg-success";
+              default:
+                  return "text-bg-secondary";
+          }
+      }
+
+      function highlightSelectedInList() {
+          document.querySelectorAll(".risk-item").forEach(el => {
+              const id = el.dataset.riskId;
+              el.classList.toggle("selected", selectedRiskId && id === selectedRiskId);
+          });
+      }
+
+      function renderRiskList() {
+          const list = $("riskList");
+          const q = ($("filterSearch").value || "").trim().toLowerCase();
+
+          const computed = state.risks.map(computeRisk);
+          list.innerHTML = "";
+
+          computed.forEach(r => {
+              const hay = `${r.id} ${r.domain} ${r.title}`.toLowerCase();
+              if (q && !hay.includes(q)) return;
+
+              const item = document.createElement("div");
+              item.className = "risk-item";
+              item.dataset.riskId = r.id;
+
+              const chk = document.createElement("input");
+              chk.type = "checkbox";
+              chk.className = "form-check-input mt-1";
+              chk.checked = (r.visible !== false);
+
+              chk.addEventListener("change", () => {
+                  const target = state.risks.find(x => x.id === r.id);
+                  if (target) target.visible = chk.checked;
+                  saveState();
+                  renderMatrix();
+                  updateCounters();
+              });
+
+              const meta = document.createElement("div");
+              meta.className = "meta";
+              meta.innerHTML = `
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <div class="title"><span class="mono">${escapeHtml(r.id)}</span> – ${escapeHtml(r.title)}</div>
+            <span class="badge ${badgeClass(r.level)} tag">${escapeHtml(r.level)}</span>
+          </div>
+          <div class="sub">${escapeHtml(r.domain)} · ${escapeHtml(r.step || "")} · <span class="mono">${r.p}×${r.i}=${r.score}</span></div>
+        `;
+
+              meta.addEventListener("click", () => editRisk(r.id));
+
+              item.appendChild(chk);
+              item.appendChild(meta);
+
+              list.appendChild(item);
+          });
+
+          highlightSelectedInList();
+      }
+
+      function setAllVisible(value) {
+          state.risks = state.risks.map(r => ({
+              ...r,
+              visible: value
+          }));
+          saveState();
+          renderAll();
+      }
+
+      function computeDomainMastery() {
+          const risks = (state.risks || []).map(computeRisk);
+
+          const byDomain = {};
+
+          risks.forEach(r => {
+              const d = r.domain || "Non défini";
+              if (!byDomain[d]) {
+                  byDomain[d] = {
+                      domain: d,
+                      total: 0,
+                      critHigh: 0,
+                      mastered: 0,
+                      processes: new Set()
+                  };
+              }
+
+              const dom = byDomain[d];
+              dom.total++;
+
+              if (r.level === "Critique" || r.level === "Élevé") {
+                  dom.critHigh++;
+              }
+
+              if (r.control?.implemented && r.scoreRes <= 7) {
+                  dom.mastered++;
+              }
+
+              if (r.processId) dom.processes.add(r.processId);
+          });
+
+          // Finalise
+          return Object.values(byDomain).map(d => {
+              d.rate = d.total ? Math.round((d.mastered / d.total) * 100) : 0;
+              d.processes = Array.from(d.processes);
+              d.level = domainLevel(d);
+              return d;
+          });
+      }
+
+      function domainLevel(d) {
+          if (d.critHigh > 0 && d.rate < 50) return "Faible";
+          if (d.rate < 80) return "À renforcer";
+          return "Maîtrisé";
+      }
+
+      function renderDomainSummaryCards(domains) {
+          const c = document.getElementById("domainSummaryCards");
+          if (!c) return;
+
+          c.innerHTML = "";
+
+          domains.forEach(d => {
+              const color =
+                  d.level === "Maîtrisé" ? "success" :
+                  d.level === "À renforcer" ? "warning" : "danger";
+
+              c.innerHTML += `
+		  <div class="col-md-3">
+			<div class="card border-${color} h-100">
+			  <div class="card-body">
+				<div class="fw-semibold">${escapeHtml(d.domain)}</div>
+				<div class="display-6">${d.rate}%</div>
+				<div class="small text-muted">
+				  ${d.mastered}/${d.total} risques maîtrisés
+				</div>
+				<span class="badge text-bg-${color} mt-2">${d.level}</span>
+			  </div>
+			</div>
+		  </div>
+		`;
+          });
+      }
+
+      function renderDomainTable(domains) {
+          const tb = document.getElementById("domainTableBody");
+          if (!tb) return;
+
+          tb.innerHTML = "";
+
+          domains.forEach(d => {
+              const color =
+                  d.level === "Maîtrisé" ? "success" :
+                  d.level === "À renforcer" ? "warning" : "danger";
+
+              tb.innerHTML += `
+		  <tr>
+			<td class="fw-semibold">${escapeHtml(d.domain)}</td>
+			<td>${d.total}</td>
+			<td>${d.critHigh}</td>
+			<td>${d.mastered}</td>
+			<td>${d.rate}%</td>
+			<td><span class="badge text-bg-${color}">${d.level}</span></td>
+			<td class="small mono">
+			  ${d.processes.join(", ") || "—"}
+			</td>
+		  </tr>
+		`;
+          });
+      }
+
+      function renderDomainMasteryTab() {
+          const domains = computeDomainMastery();
+          renderDomainSummaryCards(domains);
+          renderDomainTable(domains);
+      }
+
+      function svgElementToPngDataUrl(svgEl, targetWidth = 1200) {
+          if (!svgEl) return null;
+
+          // 1) Sérialiser le SVG
+          const svg = svgEl.cloneNode(true);
+
+          // Nettoyage léger (events)
+          svg.querySelectorAll("*").forEach(el => {
+              el.removeAttribute("onclick");
+              el.removeAttribute("ondblclick");
+              el.removeAttribute("onmouseover");
+              el.removeAttribute("onmouseout");
+          });
+
+          // 2) Dimensions
+          const vb = svg.getAttribute("viewBox") || "0 0 1200 720";
+          const [, , vbW, vbH] = vb.split(/\s+/).map(Number);
+          const width = targetWidth;
+          const height = Math.round((vbH / vbW) * width);
+
+          // 3) Canvas
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+
+          // Fond blanc (important pour Word)
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+
+          // 4) Rendu via canvg
+          const svgText = new XMLSerializer().serializeToString(svg);
+          const v = window.canvg.Canvg.fromString(ctx, svgText, {
+              ignoreAnimation: true,
+              ignoreMouse: true
+          });
+          v.render();
+
+          // 5) PNG base64
+          return canvas.toDataURL("image/png");
+      }
+
+      function cloneMacroprocessSvgForWord() {
+          const src = document.getElementById("mpMap");
+          if (!src) {
+              return "<p><em>Cartographie des macroprocessus non disponible.</em></p>";
+          }
+
+          // Clone profond
+          const clone = src.cloneNode(true);
+
+          // Nettoyage : retirer IDs dupliqués / events
+          clone.removeAttribute("id");
+          clone.querySelectorAll("*").forEach(el => {
+              el.removeAttribute("onclick");
+              el.removeAttribute("ondblclick");
+              el.removeAttribute("onmouseover");
+              el.removeAttribute("onmouseout");
+              el.style.cursor = "default";
+          });
+
+          // Forcer taille compatible Word
+          clone.setAttribute("width", "100%");
+          clone.setAttribute("height", "350");
+          clone.setAttribute("viewBox", src.getAttribute("viewBox") || "0 0 1200 400");
+
+          return clone.outerHTML;
+      }
+
+
+      // Register (table) ---------------------------------------------
+      function renderRegister() {
+          const q = ($("search").value || "").trim().toLowerCase();
+          const lvl = $("filterLevel").value;
+
+          const computed = state.risks.map(computeRisk);
+
+          const filtered = computed.filter(r => {
+              const hay = `${r.id} ${r.domain} ${r.title} ${r.justification || ""} ${(r.control?.name || "")}`.toLowerCase();
+              const okQ = !q || hay.includes(q);
+              const okL = !lvl || r.level === lvl;
+              return okQ && okL;
+          });
+
+          const tb = $("tbody");
+          tb.innerHTML = "";
+
+          filtered.forEach(r => {
+              const ctrlTxt = (r.control?.name || "").trim() || "—";
+              const ctrlFlag = r.control?.implemented ? `<span class="badge text-bg-success ms-1">effectif</span>` : `<span class="badge text-bg-secondary ms-1">prévu</span>`;
+              const residualTxt = (r.control?.implemented) ?
+                  `${r.pRes}×${r.iRes}=${r.scoreRes} (${r.levelRes})` :
+                  "—";
+
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+          <td class="mono fw-semibold">${r.id}</td>
+          <td>${escapeHtml(r.domain)}</td>
+          <td>
+            <div class="fw-semibold">${escapeHtml(r.title)}</div>
+            <div class="small-muted">${escapeHtml(r.step || "")}</div>
+          </td>
+          <td class="mono">${r.p}×${r.i}=${r.score}</td>
+          <td><span class="badge ${badgeClass(r.level)}">${escapeHtml(r.level)}</span></td>
+          <td>
+            <div>${escapeHtml(ctrlTxt)} ${ctrlFlag}</div>
+            <div class="small-muted">ΔP=${r.control?.dP ?? 0}, ΔI=${r.control?.dI ?? 0}</div>
+          </td>
+          <td class="mono">${escapeHtml(residualTxt)}</td>
+          <td class="nowrap">
+            <button class="btn btn-sm btn-outline-primary me-1" data-edit="${r.id}">Éditer</button>
+            <button class="btn btn-sm btn-outline-danger" data-del="${r.id}">Suppr.</button>
+          </td>
+        `;
+              tb.appendChild(tr);
+          });
+
+          tb.querySelectorAll("button[data-edit]").forEach(b => {
+              b.addEventListener("click", () => editRisk(b.dataset.edit));
+          });
+          tb.querySelectorAll("button[data-del]").forEach(b => {
+              b.addEventListener("click", () => deleteRisk(b.dataset.del));
+          });
+      }
+
+      function updateCounters() {
+          const computed = state.risks.map(computeRisk);
+          $("countRisks").textContent = computed.length;
+          $("countCrit").textContent = computed.filter(r => r.level === "Critique").length;
+          $("countHigh").textContent = computed.filter(r => r.level === "Élevé").length;
+          $("countShown").textContent = computed.filter(r => r.visible !== false).length;
+      }
+
+      function computeMpDomainMatrix() {
+          const risks = (state.risks || []).map(computeRisk);
+          const processes = state.processes || [];
+          const mps = state.macroprocesses || [];
+
+          // domaines existants
+          const domains = Array.from(new Set(risks.map(r => r.domain || "Non défini"))).sort();
+
+          // index processus → macroprocessus
+          const procToMp = {};
+          processes.forEach(p => procToMp[p.id] = p.macroprocessId);
+
+          // init structure
+          const matrix = {};
+          mps.forEach(mp => {
+              matrix[mp.id] = {};
+              domains.forEach(d => {
+                  matrix[mp.id][d] = {
+                      total: 0,
+                      mastered: 0
+                  };
+              });
+          });
+
+          // alimentation
+          risks.forEach(r => {
+              const mpId = procToMp[r.processId];
+              if (!mpId || !matrix[mpId]) return;
+
+              const d = r.domain || "Non défini";
+              matrix[mpId][d].total++;
+
+              if (r.control?.implemented && r.scoreRes <= 7) {
+                  matrix[mpId][d].mastered++;
+              }
+          });
+
+          return {
+              matrix,
+              domains
+          };
+      }
+
+      function renderMpDomainMatrix() {
+          const {
+              matrix,
+              domains
+          } = computeMpDomainMatrix();
+
+          const th = document.getElementById("mpDomainHeader");
+          const tb = document.getElementById("mpDomainBody");
+          if (!th || !tb) return;
+
+          // Header
+          th.innerHTML = `<th>Macroprocessus</th>` +
+              domains.map(d => `<th>${escapeHtml(d)}</th>`).join("");
+
+          // Body
+          tb.innerHTML = "";
+
+          Object.entries(matrix).forEach(([mpId, row]) => {
+              const tr = document.createElement("tr");
+
+              tr.innerHTML = `<td class="fw-semibold text-start mono">${mpId}</td>`;
+
+              domains.forEach(d => {
+                  const cell = row[d];
+                  let level = "success";
+                  if (cell.total > 0 && cell.mastered / cell.total < 0.8) level = "warning";
+                  if (cell.total > 0 && cell.mastered / cell.total < 0.5) level = "danger";
+
+                  tr.innerHTML += `
+			<td>
+			  ${cell.total === 0 ? "—" :
+				`<span class="badge text-bg-${level}">
+				  ${cell.mastered}/${cell.total}
+				</span>`
+			  }
+			</td>`;
+              });
+
+              tb.appendChild(tr);
+          });
+      }
+
+      function makeWordTable(rows) {
+          const {
+              Table,
+              TableRow,
+              TableCell,
+              WidthType,
+              Paragraph
+          } = window.docx;
+
+          return new Table({
+              width: {
+                  size: 100,
+                  type: WidthType.PERCENTAGE
+              },
+              rows: rows.map(r =>
+                  new TableRow({
+                      children: r.map(c =>
+                          new TableCell({
+                              children: [new Paragraph(String(c))],
+                          })
+                      )
+                  })
+              )
+          });
+      }
+
+
+
+      function renderAll() {
+          updateCounters();
+          renderMatrix();
+          renderRiskList();
+          renderRegister();
+          renderMacroprocessMap();
+          renderMacroprocessList();
+          renderProcessTab?.();
+          renderProceduresTab?.();
+          renderMatrixProcessFilter();
+          renderMatrixProcedureFilter();
+          renderMpDomainMatrix();
+          renderDomainMasteryTab();
+          renderControlPlan();
+          applySimpleModeUI();
+      }
+
+      // Import/export -----------------------------------------------
+      function exportJSON() {
+          const blob = new Blob([JSON.stringify(state, null, 2)], {
+              type: "application/json"
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "controleinterne_risques_mails.json";
+          a.click();
+          URL.revokeObjectURL(url);
+      }
+
+      async function importJSON(file) {
+          const txt = await file.text();
+          const data = JSON.parse(txt);
+          if (!data || !Array.isArray(data.risks)) {
+              alert("JSON invalide (attendu: { risks: [...] })");
+              return;
+          }
+          data.risks = data.risks.map(r => ({
+              visible: true,
+              ...r
+          }));
+          state = data;
+          sortRisks();
+          saveState();
+          selectedRiskId = null;
+          renderAll();
+          clearForm();
+      }
+
+      async function buildReviewHtml() {
+          const wrap = document.createElement("div");
+          wrap.className = "word-export";
+
+          /* ========= STYLES ========= */
+		  wrap.innerHTML += `
+            <style>
+              /* Portrait (par défaut) */
+              @page WordSectionPortrait { size: A4; }
+              div.WordSectionPortrait { page: WordSectionPortrait; }
+
+              /* Paysage */
+              @page WordSectionLandscape { size: A4 landscape; mso-page-orientation: landscape; }
+              div.WordSectionLandscape { page: WordSectionLandscape; }
+
+              .page-break { page-break-after: always; }
+              .img-full { width: 100%; height: auto; display: block; margin: 0 auto; }
+              .center { text-align: center; }
+            </style>
+		  `;
+          /* ========= PAGE DE GARDE ========= */
+          wrap.innerHTML += `
+		<h1>Revue de direction – ISO 9001</h1>
+		<p><strong>Périmètre :</strong> Système de management / contrôle interne</p>
+		<p><strong>Date :</strong> ${new Date().toLocaleDateString()}</p>
+		<div class="page-break"></div>
+
+		<h2>Sommaire</h2>
+		<ul>
+		  <li>1. Cartographie des macroprocessus</li>
+		  <li>2. Processus et procédures</li>
+		  <li>3. Matrice des risques</li>
+		  <li>4. Macroprocessus × Domaines</li>
+		  <li>5. Plan de contrôle interne</li>
+		  <li>6. Décisions de direction</li>
+		</ul>
+		<div class="page-break"></div>
+	  `;
+
+          /* ========= 1. CARTOGRAPHIE MACROPROCESSUS ========= */
+
+          // === Cartographie macroprocessus (PNG) ===
+          const mpWrap = document.getElementById("mpMapWrap");
+          const mpPng = await captureElementOffscreen(mpWrap, 640);
+
+          wrap.innerHTML += `
+            <div class="WordSectionLandscape">
+              <h2 class="center">1. Cartographie des macroprocessus</h2>
+              ${
+                mpPng
+                  ? `<img class="img-full" src="${mpPng}" />`
+                  : `<p class="center"><em>Cartographie indisponible.</em></p>`
+              }
+            </div>
+            <div class="page-break"></div>
+          `;
+
+          // Retour portrait pour le contenu détaillé
+          wrap.innerHTML += `<div class="WordSectionPortrait">`;
+          state.macroprocesses.forEach(mp => {
+              wrap.innerHTML += `
+		  <h3>${mp.id} – ${mp.name}</h3>
+		  <p>Type : ${mp.type === "P" ? "Pilotage" : mp.type === "M" ? "Métier" : "Support"}</p>
+		  <p>Responsable : ${mp.owner || "—"}</p>
+		`;
+          });
+
+          wrap.innerHTML += `</div><div class="page-break"></div>`;
+
+          /* ========= 2. PROCESSUS & PROCÉDURES ========= */
+          wrap.innerHTML += `<h2>2. Processus et procédures</h2>`;
+
+          state.macroprocesses.forEach((mp, idx) => {
+
+              if (idx > 0) {
+                  wrap.innerHTML += `<div class="page-break"></div>`;
+              }
+
+              wrap.innerHTML += `
+			<h2>${mp.id} – ${mp.name}</h2>
+			<p><strong>Type :</strong> ${
+			  mp.type === "P" ? "Pilotage" :
+			  mp.type === "M" ? "Métier" : "Support"
+			}</p>
+			<p><strong>Responsable :</strong> ${mp.owner || "—"}</p>
+		  `;
+
+              state.processes
+                  .filter(p => p.macroprocessId === mp.id)
+                  .forEach(p => {
+                      wrap.innerHTML += `<h3>${p.id} – ${p.name}</h3>`;
+
+                      state.procedures
+                          .filter(pr => pr.processId === p.id)
+                          .forEach(pr => {
+                              wrap.innerHTML += `<h4>${pr.id} – ${pr.name} (v${pr.version || "—"})</h4>
+				  <table>
+					<tr><th>Qui ?</th><th>Fait quoi ?</th><th>Comment ?</th><th>Risques</th></tr>
+					${(pr.steps || []).map(s => `
+					  <tr>
+						<td>${s.who || "—"}</td>
+						<td>${s.what || "—"}</td>
+						<td>${s.how || "—"}</td>
+						<td>${(s.riskIds || []).join(", ") || "—"}</td>
+					  </tr>
+					`).join("")}
+				  </table>`;
+                          });
+                  });
+          });
+
+          wrap.innerHTML += `<div class="page-break"></div>`;
+
+          /* ========= 3. MATRICE DES RISQUES ========= */
+          // Image de la matrice (page seule + paysage)
+          const matrixWrap = document.getElementById("riskMatrixWrap");
+          // Masque le panneau latéral (colonne droite) dans la capture
+          // .matrix-area = grille 2 colonnes (gauche: matrice, droite: filtre d’affichage + liste)
+          const matrixPng = await captureElementOffscreen(matrixWrap, 1600, {
+              hideSelectors: [".matrix-area > div:nth-child(2)"]
+          });
+
+          wrap.innerHTML += `
+            <div class="WordSectionLandscape">
+              <h2 class="center">3. Matrice des risques</h2>
+              ${
+                matrixPng
+                  ? `<img class="img-full" src="${matrixPng}" />`
+                  : `<p class="center"><em>Matrice indisponible.</em></p>`
+              }
+            </div>
+            <div class="page-break"></div>
+          `;
+
+          // (Optionnel mais souvent utile) : garder le tableau détaillé en portrait sur la page suivante
+          wrap.innerHTML += `
+            <div class="WordSectionPortrait">
+              <h3>Liste des risques (détail)</h3>
+              <table>
+                <tr>
+                  <th>Risque</th><th>Domaine</th><th>Processus</th>
+                  <th>Score initial</th><th>Niveau</th><th>Score résiduel</th><th>Statut</th>
+                </tr>
+                ${(state.risks || []).map(computeRisk).map(r => `
+                  <tr>
+                    <td>${r.id} – ${r.title}</td>
+                    <td>${r.domain || "—"}</td>
+                    <td>${r.processId || "—"}</td>
+                    <td>${r.score}</td>
+                    <td>${r.level}</td>
+                    <td>${r.control?.implemented ? r.scoreRes : "—"}</td>
+                    <td>${r.control?.implemented && r.scoreRes <= 7 ? "Maîtrisé" : "À renforcer"}</td>
+                  </tr>
+                `).join("")}
+              </table>
+            </div>
+            <div class="page-break"></div>
+          `;
+
+          /* ========= 4. MACROPROCESSUS × DOMAINES ========= */
+          wrap.innerHTML += `<div class="WordSectionPortrait"><h2 class="center">4. Macroprocessus × Domaines</h2>`;
+
+          const {
+              matrix,
+              domains
+          } = computeMpDomainMatrix();
+
+          wrap.innerHTML += `
+		<table>
+		  <tr>
+			<th>Macroprocessus</th>
+			${domains.map(d => `<th>${d}</th>`).join("")}
+		  </tr>
+		  ${Object.entries(matrix).map(([mpId, row]) => `
+			<tr>
+			  <td>${mpId}</td>
+			  ${domains.map(d => {
+				const c = row[d];
+				return `<td>${c.total ? `${c.mastered}/${c.total}` : "—"}</td>`;
+			  }).join("")}
+			</tr>
+		  `).join("")}
+		</table>
+	  `;
+
+          wrap.innerHTML += `</div><div class="page-break"></div>`;
+
+          /* ========= 5. PLAN DE CONTRÔLE INTERNE ========= */
+          wrap.innerHTML += `
+            <h2>5. Plan de contrôle interne</h2>
+            <p>Généré automatiquement à partir des risques (niveau Élevé/Critique ou contrôles clés).</p>
+          `;
+
+          // Génère le PCI depuis le modèle (fonction ajoutée dans les évolutions précédentes)
+          const plan = (typeof generateControlPlan === "function") ? generateControlPlan() : [];
+
+          if (!plan.length) {
+              wrap.innerHTML += `<p><em>Aucun élément de plan (vérifier la cartographie des risques et les contrôles).</em></p>`;
+          } else {
+              wrap.innerHTML += `
+                <table>
+                  <tr>
+                    <th>Macroprocessus</th>
+                    <th>Processus</th>
+                    <th>Risque</th>
+                    <th>Niveau</th>
+                    <th>🔑</th>
+                    <th>Contrôle</th>
+                    <th>Responsable</th>
+                    <th>Fréquence</th>
+                    <th>Preuve attendue</th>
+                    <th>État</th>
+                  </tr>
+                  ${plan.map(x => `
+                    <tr>
+                      <td>${escapeHtml(x.mpLabel || "—")}</td>
+                      <td>${escapeHtml(x.processLabel || "—")}</td>
+                      <td>${escapeHtml((x.riskId || "—") + " — " + (x.riskTitle || ""))}</td>
+                      <td>${escapeHtml(x.level || "—")}</td>
+                      <td style="text-align:center;">${x.key ? "✅" : "—"}</td>
+                      <td>${escapeHtml(x.controlName || "—")}</td>
+                      <td>${escapeHtml(x.owner || "—")}</td>
+                      <td>${escapeHtml(x.frequency || "—")}</td>
+                      <td>${escapeHtml(x.evidence || "—")}</td>
+                      <td>${x.status === "done" ? "Réalisé" : "À faire"}</td>
+                    </tr>
+                  `).join("")}
+                </table>
+              `;
+          }
+
+          wrap.innerHTML += `</div><div class="page-break"></div>`;
+
+          /* ========= 6. DECISIONS ========= */
+          wrap.innerHTML += `
+		  <div class="page-break"></div>
+
+		  <h2>6. Décisions de direction</h2>
+
+		  <p>
+			Cette section est destinée à formaliser les décisions prises lors de la revue
+			de direction, conformément à la norme ISO 9001.
+		  </p>
+
+		  <table>
+			<tr>
+			  <th>Constat / Point examiné</th>
+			  <th>Décision</th>
+			  <th>Responsable</th>
+			  <th>Échéance</th>
+			</tr>
+			<tr>
+			  <td>&nbsp;</td><td></td><td></td><td></td>
+			</tr>
+			<tr>
+			  <td>&nbsp;</td><td></td><td></td><td></td>
+			</tr>
+			<tr>
+			  <td>&nbsp;</td><td></td><td></td><td></td>
+			</tr>
+		  </table>
+
+		  <p><strong>Date de validation :</strong> ................................................</p>
+		  <p><strong>Signature :</strong> ................................................</p>
+		`;
+
+          return wrap;
+      }
+
+      // Events -------------------------------------------------------
+      ["p", "i"].forEach(id => $(id).addEventListener("input", recalcForm));
+
+      $("btnSave").addEventListener("click", upsertRiskFromForm);
+      $("btnClear").addEventListener("click", clearForm);
+
+      $("search").addEventListener("input", renderRegister);
+      $("filterLevel").addEventListener("change", renderRegister);
+
+      $("filterSearch").addEventListener("input", renderRiskList);
+
+      $("btnAll").addEventListener("click", () => setAllVisible(true));
+      $("btnNone").addEventListener("click", () => setAllVisible(false));
+
+      $("btnExport").addEventListener("click", exportJSON);
+      $("btnImport").addEventListener("click", () => $("fileImport").click());
+      $("fileImport").addEventListener("change", (e) => {
+          const f = e.target.files?.[0];
+          if (f) importJSON(f);
+          e.target.value = "";
+      });
+
+      $("btnReset").addEventListener("click", () => {
+          if (!confirm("Réinitialiser toutes les données (retour au jeu d’exemples) ?")) return;
+          state = {
+              risks: seedRisks()
+          };
+          sortRisks();
+          saveState();
+          selectedRiskId = null;
+          renderAll();
+          clearForm();
+      });
+
+      // PCI / Mode simplifié events
+      $("toggleSimpleMode")?.addEventListener("change", () => {
+          applySimpleModeUI();
+          // En mode simplifié, on pousse naturellement vers le PCI
+          if ($("toggleSimpleMode").checked) openTab("tab-control-plan");
+      });
+      $("pciFilterOwner")?.addEventListener("change", renderControlPlan);
+      $("pciFilterStatus")?.addEventListener("change", renderControlPlan);
+      $("pciOnlyKey")?.addEventListener("change", renderControlPlan);
+
+      // Bootstrap tabs : quand on ouvre l'onglet PCI, on (re)génère
+      $("mainTabs")?.addEventListener("shown.bs.tab", (ev) => {
+          const target = ev.target?.getAttribute?.("data-bs-target") || "";
+          if (target === "#tab-control-plan") renderControlPlan();
+      });
+
+      $("btnSaveMP").addEventListener("click", upsertMacroprocessFromForm);
+      $("btnViewProcedures")?.addEventListener("click", () => {
+          const pid = selectedProcessId;
+          if (!pid) return;
+          openProceduresTabForProcess(pid);
+      });
+
+
+      $("mpSearch").addEventListener("input", renderMacroprocessList);
+
+      $("procMpSelect").addEventListener("change", () => {
+          selectedMacroprocessForProcessTab = $("procMpSelect").value;
+          renderProcessTab();
+      });
+
+      $("procSearch").addEventListener("input", renderProcessList);
+
+      $("btnNewProcess").addEventListener("click", newProcess);
+      $("btnClearProcess").addEventListener("click", clearProcessForm);
+
+      $("btnSaveProcess").addEventListener("click", upsertProcessFromForm);
+      $("btnDeleteProcess").addEventListener("click", deleteProcess);
+
+      $("proc2ProcessSelect")?.addEventListener("change", () => {
+          selectedProcessForProceduresTab = $("proc2ProcessSelect").value;
+          renderProcedureList();
+          clearProcedureForm();
+      });
+
+      $("proc2Search")?.addEventListener("input", renderProcedureList);
+
+      $("btnNewProcedure")?.addEventListener("click", newProcedure);
+      $("btnClearProcedure")?.addEventListener("click", clearProcedureForm);
+
+      $("btnSaveProcedure")?.addEventListener("click", upsertProcedureFromForm);
+      $("btnDeleteProcedure")?.addEventListener("click", deleteProcedure);
+
+      $("btnAddStep")?.addEventListener("click", addStep);
+
+      $("btnBackToProcedure")?.addEventListener("click", () => {
+          if (!lastContext || lastContext.fromTab !== "tab-procedures") return;
+
+          const {
+              procedureId,
+              processId
+          } = lastContext;
+
+          // Nettoyage du contexte (évite boucles)
+          lastContext = null;
+
+          openTab("tab-procedures");
+
+          setTimeout(() => {
+              selectedProcessForProceduresTab = processId;
+              renderProceduresTab?.();
+              if (procedureId) editProcedure(procedureId);
+          }, 50);
+      });
+
+      $("btnExportPdf")?.addEventListener("click", async () => {
+          // Export PDF : le contenu doit être VISIBLE (sinon html2canvas capture du vide).
+          // On force l'onglet PCI actif, on attend 2 frames, puis on exporte.
+
+          const prevActiveBtn = document.querySelector('#mainTabs .nav-link.active');
+          const prevTarget = prevActiveBtn?.getAttribute("data-bs-target") || null;
+
+          openTab("tab-control-plan");
+          await new Promise(requestAnimationFrame);
+          await new Promise(requestAnimationFrame);
+
+          const el = document.getElementById("tab-control-plan");
+          if (!el) {
+              if (prevTarget) openTab(prevTarget.replace("#",""));
+              alert("Export PDF impossible : section PCI introuvable.");
+              return;
+          }
+
+          const opt = {
+              margin: 10,
+              filename: "Plan_de_controle_interne.pdf",
+              image: { type: "jpeg", quality: 0.98 },
+              html2canvas: { scale: 2, backgroundColor: "#ffffff", useCORS: true },
+              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+          };
+
+          try {
+              await html2pdf().set(opt).from(el).save();
+          } finally {
+              if (prevTarget) openTab(prevTarget.replace("#",""));
+          }
+      });
+
+      $("btnExportWord")?.addEventListener("click", async () => {
+          const html = (await buildReviewHtml()).outerHTML;
+
+          const blob = window.htmlDocx.asBlob(html);
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "Revue_de_direction.docx";
+          a.click();
+      });
+
+      $("matrixFilterProcedure")?.addEventListener("change", () => {
+          const fpr = document.getElementById("matrixFilterProcedure").value || "";
+          if (!fpr) {
+              renderMatrix();
+              return;
+          }
+
+          const pr = (state.procedures || []).find(p => String(p.id) === String(fpr));
+          if (pr?.processId) {
+              const selP = document.getElementById("matrixFilterProcess");
+              if (selP) selP.value = pr.processId;
+          }
+
+          renderMatrix();
+      });
+
+      function openTab(tabPaneId) {
+          const btn = document.querySelector(`button[data-bs-target="#${tabPaneId}"]`);
+          if (!btn || !window.bootstrap?.Tab) return;
+          window.bootstrap.Tab.getOrCreateInstance(btn).show();
+      }
+
+
+      // Init ---------------------------------------------------------
+      let state = loadState();
+      let selectedProcedureId = null;
+      let selectedProcessForProceduresTab = null;
+
+      // Assure structure
+      if (!state.procedures) state.procedures = [];
+
+      if (!state.processes || state.processes.length === 0) {
+          state.processes = [
+
+              /* =========================
+                 MPP01 – Pilotage du contrôle interne
+                 ========================= */
+              {
+                  id: "MPP01-001",
+                  macroprocessId: "MPP01",
+                  name: "Gouvernance du contrôle interne",
+                  pilot: "Chef d’établissement",
+                  purpose: "Définir l’organisation, les responsabilités et les règles du contrôle interne",
+                  scope: "Ensemble des activités de l’EPLE",
+                  inputs: "Textes réglementaires, orientations académiques",
+                  outputs: "Règles internes, décisions de pilotage",
+                  resources: "Instances, tableaux de bord",
+                  interactions: "Direction, SGE, services",
+                  kpi: "Taux de procédures formalisées",
+                  risks: "Risque de gouvernance défaillante",
+                  docs: "Charte de contrôle interne"
+              },
+              {
+                  id: "MPP01-002",
+                  macroprocessId: "MPP01",
+                  name: "Cartographie des risques et plan de maîtrise",
+                  pilot: "SGE",
+                  purpose: "Identifier, évaluer et maîtriser les risques",
+                  scope: "Processus administratifs et supports",
+                  inputs: "Activités, incidents, audits",
+                  outputs: "Cartographie, plan de contrôle",
+                  resources: "Outil risques, référentiels",
+                  interactions: "Tous services",
+                  kpi: "Nb risques critiques non maîtrisés",
+                  risks: "Risque non identifié",
+                  docs: "Cartographie des risques"
+              },
+              {
+                  id: "MPP01-003",
+                  macroprocessId: "MPP01",
+                  name: "Revue de conformité et auditabilité",
+                  pilot: "SGE",
+                  purpose: "Garantir la conformité et la production de preuves",
+                  scope: "Procédures et enregistrements",
+                  inputs: "Exigences réglementaires",
+                  outputs: "Rapports de conformité",
+                  resources: "Check-lists, audits",
+                  interactions: "Auditeurs, services",
+                  kpi: "Nb écarts constatés",
+                  risks: "Non-conformité",
+                  docs: "Rapports d’audit"
+              },
+              {
+                  id: "MPP01-004",
+                  macroprocessId: "MPP01",
+                  name: "Gestion des non-conformités et actions correctives",
+                  pilot: "SGE",
+                  purpose: "Traiter les écarts et améliorer le système",
+                  scope: "Tous processus",
+                  inputs: "Constats, incidents",
+                  outputs: "Actions correctives",
+                  resources: "Plans d’actions",
+                  interactions: "Services",
+                  kpi: "Taux d’actions clôturées",
+                  risks: "Récurrence des écarts",
+                  docs: "Registre NC"
+              },
+              {
+                  id: "MPP01-005",
+                  macroprocessId: "MPP01",
+                  name: "Pilotage documentaire",
+                  pilot: "SGE",
+                  purpose: "Maîtriser les documents et procédures",
+                  scope: "Procédures et enregistrements",
+                  inputs: "Documents sources",
+                  outputs: "Procédures validées",
+                  resources: "GED",
+                  interactions: "Tous services",
+                  kpi: "% documents à jour",
+                  risks: "Procédure obsolète",
+                  docs: "Référentiel documentaire"
+              },
+
+              /* =========================
+                 MPP02 – Pilotage qualité / conformité
+                 ========================= */
+              {
+                  id: "MPP02-001",
+                  macroprocessId: "MPP02",
+                  name: "Management de la qualité",
+                  pilot: "Chef d’établissement",
+                  purpose: "Piloter la performance et la qualité",
+                  scope: "Système qualité",
+                  inputs: "Objectifs, indicateurs",
+                  outputs: "Plans d’amélioration",
+                  resources: "Tableaux de bord",
+                  interactions: "Tous services",
+                  kpi: "Atteinte des objectifs",
+                  risks: "Dérive qualité",
+                  docs: "Politique qualité"
+              },
+              {
+                  id: "MPP02-002",
+                  macroprocessId: "MPP02",
+                  name: "Veille réglementaire",
+                  pilot: "SGE",
+                  purpose: "Identifier et suivre les obligations",
+                  scope: "Réglementation EPLE",
+                  inputs: "Textes officiels",
+                  outputs: "Synthèses réglementaires",
+                  resources: "Veille",
+                  interactions: "Direction",
+                  kpi: "Textes intégrés",
+                  risks: "Obligation non identifiée",
+                  docs: "Registre veille"
+              },
+
+              /* =========================
+                 MPM01 – Gestion administrative EPLE
+                 ========================= */
+              {
+                  id: "MPM01-001",
+                  macroprocessId: "MPM01",
+                  name: "Gestion des courriels et du classement probant",
+                  pilot: "SGE",
+                  purpose: "Assurer traçabilité, preuve et conformité des échanges",
+                  scope: "Messagerie professionnelle",
+                  inputs: "Courriels entrants",
+                  outputs: "Courriels classés et archivés",
+                  resources: "Messagerie, arborescence",
+                  interactions: "Tous services",
+                  kpi: "% mails classés < 30 jours",
+                  risks: "Perte de preuve",
+                  docs: "Procédure mails"
+              },
+              {
+                  id: "MPM01-002",
+                  macroprocessId: "MPM01",
+                  name: "Gestion budgétaire et comptable",
+                  pilot: "Agent comptable",
+                  purpose: "Assurer l’exécution budgétaire",
+                  scope: "Budget EPLE",
+                  inputs: "Décisions, commandes",
+                  outputs: "Mandats, titres",
+                  resources: "Op@le",
+                  interactions: "Collectivité, fournisseurs",
+                  kpi: "Délais de paiement",
+                  risks: "Erreur comptable",
+                  docs: "Procédure budgétaire"
+              },
+
+              /* =========================
+                 MPM02 – Gestion restauration
+                 ========================= */
+              {
+                  id: "MPM02-001",
+                  macroprocessId: "MPM02",
+                  name: "Gestion HACCP et production repas",
+                  pilot: "Chef de cuisine",
+                  purpose: "Garantir la sécurité alimentaire",
+                  scope: "Restauration scolaire",
+                  inputs: "Denrées",
+                  outputs: "Repas conformes",
+                  resources: "Cuisine, plans HACCP",
+                  interactions: "Gestion, fournisseurs",
+                  kpi: "Nb non-conformités",
+                  risks: "Risque sanitaire",
+                  docs: "Plan HACCP"
+              },
+
+              /* =========================
+                 MPS01 – RH / sécurité / moyens
+                 ========================= */
+              {
+                  id: "MPS01-001",
+                  macroprocessId: "MPS01",
+                  name: "Gestion RH administrative",
+                  pilot: "SGE",
+                  purpose: "Gérer les dossiers agents",
+                  scope: "Agents EPLE",
+                  inputs: "Décisions RH",
+                  outputs: "Dossiers à jour",
+                  resources: "SIRH",
+                  interactions: "Collectivité",
+                  kpi: "Dossiers conformes",
+                  risks: "Erreur RH",
+                  docs: "Procédure RH"
+              },
+
+              /* =========================
+                 MPS02 – Systèmes d’information
+                 ========================= */
+              {
+                  id: "MPS02-001",
+                  macroprocessId: "MPS02",
+                  name: "Gestion des accès et habilitations SI",
+                  pilot: "Référent numérique",
+                  purpose: "Sécuriser l’accès aux systèmes",
+                  scope: "SI EPLE",
+                  inputs: "Demandes accès",
+                  outputs: "Comptes habilités",
+                  resources: "Annuaire, outils SI",
+                  interactions: "Agents",
+                  kpi: "Revues d’accès",
+                  risks: "Accès non autorisé",
+                  docs: "Charte SI"
+              }
+          ];
+
+          saveState();
+      }
+
+      if (!state.processes) state.processes = [];
+
+
+      sortRisks();
+      recalcForm();
+      renderAll();
+  </script>
+
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
