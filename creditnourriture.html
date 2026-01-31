@@ -64,6 +64,68 @@
       padding: .75rem;
       height: 100%;
     }
+
+    .table.table-sm tbody#breaksTableBody tr {
+      vertical-align: middle;
+    }
+
+    /* Cellules: padding un peu plus généreux et homogène */
+    .table.table-sm tbody#breaksTableBody td {
+      padding: .45rem .5rem;
+    }
+
+    /* Inputs date: largeur stable, hauteur cohérente */
+    .table.table-sm tbody#breaksTableBody input[type="date"] {
+      width: 100%;
+      min-width: 4.5rem;      /* évite l'effet "trop serré" */
+      height: 2.35rem;         /* même hauteur que boutons */
+      padding: .35rem .6rem;
+      line-height: 1.2;
+      border-radius: .6rem;
+    }
+
+    /* Colonne actions : largeur fixe + alignement vertical */
+    .table.table-sm tbody#breaksTableBody td.text-end {
+      width: 5.25rem;          /* ajuste selon ton UI */
+      white-space: nowrap;
+      padding-right: .35rem;   /* rapproche du bord */
+    }
+
+    /* Groupe d'actions : empilement vertical propre */
+    .break-actions {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .35rem;
+    }
+
+    /* Boutons actions : carrés, même taille, centrés */
+    .table.table-sm tbody#breaksTableBody .break-actions .btn {
+      width: 2.35rem;
+      height: 2.35rem;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: .65rem;
+    }
+
+    /* Icônes un peu mieux centrées/visibles */
+    .table.table-sm tbody#breaksTableBody .break-actions .btn i {
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+
+    /* Un léger “respire” sur mobile */
+    @media (max-width: 576px) {
+      .table.table-sm tbody#breaksTableBody input[type="date"] {
+        min-width: 10.5rem;
+      }
+      .table.table-sm tbody#breaksTableBody td.text-end {
+        width: 4.75rem;
+      }
+    }
   </style>
 </head>
 
@@ -149,31 +211,35 @@
                 <div class="card h-100">
                   <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Période</div>
                   <div class="card-body">
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <label class="form-label">Début</label>
-                        <input type="date" class="form-control" id="periodStart">
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label">Fin</label>
-                        <input type="date" class="form-control" id="periodEnd">
-                      </div>
-                    </div>
                     <div class="mt-3">
                       <div class="d-flex align-items-center justify-content-between gap-2">
-                        <label class="form-label mb-0">Vacances / interruptions</label>
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                          <label class="form-label mb-0">Vacances / interruptions</label>
+                        </div>
                         <div class="btn-group btn-group-sm" role="group" aria-label="Vacances">
                           <button type="button" class="btn btn-outline-primary" id="btnAddBreak">
                             <i class="bi bi-plus-circle me-1"></i>Ajouter
                           </button>
                           <button type="button" class="btn btn-outline-secondary" id="btnImportBreaks">
-                            <i class="bi bi-cloud-download me-1"></i>Importer vacances (API)
+                            <i class="bi bi-cloud-download me-1"></i>Importer
                           </button>
                         </div>
                       </div>
-                      <textarea class="form-control" id="periodBreaks" rows="3"
-                        placeholder="Ex. Toussaint : 2026-10-17 → 2026-11-02&#10;Noël : 2026-12-19 → 2027-01-04"></textarea>
+                      <div class="table-responsive mt-2">
+                        <table class="table table-sm align-middle mb-1">
+                          <thead>
+                            <tr>
+                              <th style="width:20%">Début</th>
+                              <th style="width:20%">Fin</th>
+                              <th style="width:12%"></th>
+                            </tr>
+                          </thead>
+                          <tbody id="breaksTableBody"></tbody>
+                        </table>
+                      </div>
                       <div class="form-text">Les jours en vacances sont exclus des courbes et filtres période.</div>
+                      <!-- (optionnel) si tu veux encore importer/exporter en texte : garde un champ caché -->
+                      <textarea class="form-control d-none" id="periodBreaks"></textarea>
 
                       <!-- Options import API (affiché au clic) -->
                       <div class="border rounded-3 p-2 mt-2 d-none" id="breakImportBox">
@@ -196,18 +262,32 @@
                             </button>
                           </div>
                         </div>
+
+                        <hr class="my-2">
+                        <div class="row g-2 align-items-end">
+                          <div class="col-12 col-lg-6 d-grid">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnDownloadIcs">
+                              <i class="bi bi-download me-1"></i>Télécharger .ics (Zone sélectionnée)
+                            </button>
+                          </div>
+                          <div class="col-12 col-lg-6">
+                            <label class="form-label small text-muted mb-1">Importer un fichier .ics téléchargé</label>
+                            <input type="file" class="form-control form-control-sm" id="icsFile" accept=".ics,text/calendar">
+                          </div>
+                        </div>
+
                         <div class="form-text mt-2">
-                          Astuce : l’import peut <span class="fw-semibold">ajouter</span> au texte existant (pas d’écrasement).
+                          Si l’import API est bloqué (CORS / file://), télécharge le .ics puis importe-le ici.
                         </div>
                       </div>
                     </div>
 
-+                    <!-- Modal: ajout manuel d'une période -->
-+                    <div class="modal fade" id="breakModal" tabindex="-1" aria-hidden="true">
-+                      <div class="modal-dialog">
-+                        <div class="modal-content">
-+                          <div class="modal-header">
-+                            <h5 class="modal-title"><i class="bi bi-calendar-plus me-2"></i>Ajouter une interruption</h5>
+                    <!-- Modal: ajout manuel d'une période -->
+                    <div class="modal fade" id="breakModal" tabindex="-1" aria-hidden="true">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-calendar-plus me-2"></i>Ajouter une interruption</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
                           </div>
                           <div class="modal-body">
@@ -554,12 +634,15 @@
  * SRH Op@le - Crédit nourriture
  * Basé sur exports Op@le : CLCA, resitution
  *
- * @version 0.0.1
+ * @version 0.0.2
  * @author Yann Bogdanovic
  * @description
  *  - Outil OP@LE pour calcul et suivi du crédit nourriture
+ * @changelog
+ * v0.0.2
+ *   - mécanisme d'import et d'ajour des dates d'interruptions (vacances, jours fériés…)
  */
-const APP_VERSION = "SRH OP@LE - 0.0.1";
+const APP_VERSION = "SRH OP@LE - 0.0.2";
 window.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById("app-version");
     if (el) el.textContent = APP_VERSION;
@@ -640,13 +723,12 @@ function parseBreaks(text){
   - Ajout manuel via modale
   - Import via API calendrier scolaire
 ============================== */
-function appendBreakLine(label, startISO, endISO){
-  const ta = $("periodBreaks");
-  if (!ta) return;
-  const cleanLabel = String(label || "").trim() || "Interruption";
-  const line = `${cleanLabel} : ${startISO} → ${endISO}`;
-  const cur = (ta.value || "").trim();
-  ta.value = cur ? (cur + "\n" + line) : line;
+function appendBreakRow(label, startISO, endISO){
+  const body = $("breaksTableBody");
+  if (!body) return;
+  body.appendChild(newBreakRow({ label, start: startISO, end: endISO }));
+  syncBreaksLegacyText();
+  refreshBreakTooltips();
 }
 
 function isoFromDateInput(id){
@@ -798,6 +880,197 @@ function icsDateToISO(v){
   const m = String(v||"").match(/^(\d{4})(\d{2})(\d{2})/);
   if (!m) return "";
   return `${m[1]}-${m[2]}-${m[3]}`;
+}
+
+function getIcsDownloadUrlForZone(zone){
+  // URL publique (souvent téléchargeable même si CORS bloque fetch). On l’ouvre en navigation.
+  // NB: on ne fait PAS fetch ici, on ouvre le lien.
+  const z = String(zone||"A").toUpperCase();
+  const map = {
+    "A": "https://fr.ftp.opendatasoft.com/openscol/fr-en-calendrier-scolaire/Zone-A.ics",
+    "B": "https://fr.ftp.opendatasoft.com/openscol/fr-en-calendrier-scolaire/Zone-B.ics",
+    "C": "https://fr.ftp.opendatasoft.com/openscol/fr-en-calendrier-scolaire/Zone-C.ics",
+  };
+  return map[z] || map["A"];
+}
+
+function filterVacancesAndSchoolYear(periods, schoolYear){
+  // schoolYear: "YYYY-YYYY"
+  const [sy0, sy1] = String(schoolYear||"").split("-").map(Number);
+  if (!isFinite(sy0) || !isFinite(sy1)) return periods || [];
+  const startSY = `${sy0}-09-01`;
+  const endSY = `${sy1}-09-01`; // borne haute (exclue)
+  return (periods||[])
+    .filter(p => String(p.label||"").startsWith("Vacances"))
+    .filter(p => (p.start >= startSY && p.start < endSY) || (p.end > startSY && p.end <= endSY));
+}
+
+async function importIcsFile(file, { zone, schoolYear }){
+  const text = await new Promise((resolve, reject)=>{
+    const fr = new FileReader();
+    fr.onerror = reject;
+    fr.onload = ()=> resolve(String(fr.result || ""));
+    fr.readAsText(file, "utf-8");
+  });
+  const periods = filterVacancesAndSchoolYear(parseIcsHolidays(text), schoolYear);
+  if (!periods.length) throw new Error("Aucune période 'Vacances' trouvée dans ce .ics pour l’année scolaire.");
+  for (const p of periods){
+    appendBreakRow(p.label, p.start, p.end);
+  }
+  recalcAll(); saveLocalMaybe();
+}
+
+/* ==============================
+  Vacances / interruptions (table 3 colonnes)
+============================== */
+
+function breaksToText(breaks){
+  // optionnel: garder une représentation texte (compat legacy / debug)
+  return (breaks||[])
+    .map(b => `${b.label || "Interruption"} : ${b.start} → ${b.end}`)
+    .join("\n");
+}
+
+function breaksFromText(text){
+  // réutilise ton parseBreaks actuel si tu veux migrer un ancien contenu textarea
+  const arr = parseBreaks(text);
+  return arr.map(x => ({
+    label: String(x.label || "Vacances").replace(/\s+/g," ").trim(),
+    start: x.start ? x.start.toISOString().slice(0,10) : "",
+    end: x.end ? x.end.toISOString().slice(0,10) : ""
+  }));
+}
+
+function enableBsTooltip(el){
+  // Active tooltip Bootstrap si dispo, sinon le title natif suffit.
+  if (!el) return;
+  if (window.bootstrap?.Tooltip){
+    bootstrap.Tooltip.getOrCreateInstance(el);
+  }
+}
+
+function refreshBreakTooltips(){
+  const body = $("breaksTableBody");
+  if (!body) return;
+  for (const tr of Array.from(body.children)){
+    enableBsTooltip(tr);
+  }
+}
+
+function newBreakRow({ label="", start="", end="" } = {}){
+  const tr = document.createElement("tr");
+
+  // Libellé → tooltip
+  const inpLabel = document.createElement("input");
+  inpLabel.type = "text";
+  inpLabel.className = "d-none";
+  inpLabel.value = label;
+
+  function setRowTooltip(){
+    const lbl = inpLabel.value?.trim() || "Interruption";
+    tr.title = lbl;
+    tr.setAttribute("data-bs-toggle", "tooltip");
+    tr.setAttribute("data-bs-placement", "top");
+    tr.setAttribute("data-bs-title", lbl);
+
+    if (window.bootstrap?.Tooltip){
+      const inst = bootstrap.Tooltip.getInstance(tr);
+      if (inst) inst.dispose();
+      bootstrap.Tooltip.getOrCreateInstance(tr);
+    }
+  }
+
+  const tdStart = document.createElement("td");
+  const inpStart = document.createElement("input");
+  inpStart.type = "date";
+  inpStart.className = "form-control form-control-sm";
+  inpStart.value = start;
+  tdStart.appendChild(inpStart);
+
+  const tdEnd = document.createElement("td");
+  const inpEnd = document.createElement("input");
+  inpEnd.type = "date";
+  inpEnd.className = "form-control form-control-sm";
+  inpEnd.value = end;
+  tdEnd.appendChild(inpEnd);
+
+  const tdActions = document.createElement("td");
+  tdActions.className = "text-end";
+
+  const btnEdit = document.createElement("button");
+  btnEdit.className = "btn btn-sm btn-outline-primary me-1";
+  btnEdit.innerHTML = `<i class="bi bi-pencil"></i>`;
+  btnEdit.onclick = ()=>{
+    const v = prompt("Libellé :", inpLabel.value || "");
+    if (v !== null){
+      inpLabel.value = v.trim() || "Interruption";
+      setRowTooltip();
+      syncBreaksLegacyText();
+      recalcAll(); saveLocalMaybe();
+    }
+  };
+
+  const btnDel = document.createElement("button");
+  btnDel.className = "btn btn-sm btn-outline-secondary";
+  btnDel.innerHTML = `<i class="bi bi-x-lg"></i>`;
+  btnDel.onclick = ()=>{
+    if (window.bootstrap?.Tooltip){
+      const inst = bootstrap.Tooltip.getInstance(tr);
+      if (inst) inst.dispose();
+    }
+    tr.remove();
+    syncBreaksLegacyText();
+    recalcAll(); saveLocalMaybe();
+  };
+
+  tdActions.append(btnEdit, btnDel);
+
+  tr.appendChild(inpLabel);
+  tr.appendChild(tdStart);
+  tr.appendChild(tdEnd);
+  tr.appendChild(tdActions);
+
+  setRowTooltip();
+  return tr;
+}
+
+function getBreaksFromTable(){
+  const body = $("breaksTableBody");
+  if (!body) return [];
+  const out = [];
+  for (const tr of Array.from(body.children)){
+    const inputs = tr.querySelectorAll("input");
+    if (!inputs || inputs.length < 3) continue;
+    const label = String(inputs[0].value || "").trim() || "Interruption";
+    const start = String(inputs[1].value || "").trim();
+    const end = String(inputs[2].value || "").trim();
+    if (!start || !end) continue;
+    // normalise start/end si inversés
+    const a = start <= end ? start : end;
+    const b = start <= end ? end : start;
+    out.push({ label, start: a, end: b });
+  }
+  // tri chronologique
+  out.sort((x,y)=> x.start < y.start ? -1 : x.start > y.start ? 1 : 0);
+  return out;
+}
+
+function renderBreaksTable(breaks){
+  const body = $("breaksTableBody");
+  if (!body) return;
+  body.innerHTML = "";
+  (breaks||[]).forEach(b=>{
+    body.appendChild(newBreakRow(b));
+  });
+  syncBreaksLegacyText();
+  refreshBreakTooltips();
+}
+
+function syncBreaksLegacyText(){
+  // si tu gardes le textarea caché, on le synchronise pour compat
+  const ta = $("periodBreaks");
+  if (!ta) return;
+  ta.value = breaksToText(getBreaksFromTable());
 }
 
 function isInBreaks(date, breaks){
@@ -1257,7 +1530,11 @@ function renderTransactions(){
 
   const start = parseISODate($("periodStart")?.value);
   const end   = parseISODate($("periodEnd")?.value);
-  const breaks = parseBreaks($("periodBreaks")?.value || "");
+  const breaks = getBreaksFromTable().map(b => ({
+    label: b.label,
+    start: parseISODate(b.start),
+    end: parseISODate(b.end)
+  }));
 
   const recCats = state.categories.recettes;
   const depCats = state.categories.depenses;
@@ -1623,7 +1900,7 @@ function applyPendingImports(){
 
 function bindUI(){
   // re-calc on parameter changes
-  ["periodStart","periodEnd","periodBreaks","baseThresholdPct","sepDecFactor","rulesRevenue","rulesSpend"]
+  ["periodStart","periodEnd","baseThresholdPct","sepDecFactor","rulesRevenue","rulesSpend"]
     .forEach(id=>{
       const el = $(id);
       if (!el) return;
@@ -1658,7 +1935,7 @@ function bindUI(){
         alert("Veuillez renseigner début et fin.");
         return;
       }
-      appendBreakLine(label, start, end);
+      appendBreakRow(label, start, end);
       recalcAll(); saveLocalMaybe();
       if (window.bootstrap?.Modal){
         const m = bootstrap.Modal.getOrCreateInstance($("breakModal"));
@@ -1698,13 +1975,42 @@ function bindUI(){
           return;
         }
         for (const p of periods){
-          appendBreakLine(p.label, p.start, p.end);
+          appendBreakRow(p.label, p.start, p.end);
         }
         recalcAll(); saveLocalMaybe();
       }catch(err){
         alert(`Import vacances impossible : ${err?.message || "erreur inconnue"}`);
       }finally{
         btnDoImportBreaks.disabled = false;
+      }
+    });
+  }
+
+  // Téléchargement .ics (fallback manuel)
+  const btnDownloadIcs = $("btnDownloadIcs");
+  if (btnDownloadIcs){
+    btnDownloadIcs.addEventListener("click", ()=>{
+      const zone = $("breakZone")?.value || "A";
+      const url = getIcsDownloadUrlForZone(zone);
+      // Ouvre un nouvel onglet : le navigateur gère le download/affichage.
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
+  }
+
+  // Import d'un .ics local (fallback “sans CORS”)
+  const icsFile = $("icsFile");
+  if (icsFile){
+    icsFile.addEventListener("change", async ()=>{
+      const file = icsFile.files && icsFile.files[0];
+      if (!file) return;
+      try{
+        const zone = $("breakZone")?.value || "A";
+        const schoolYear = $("breakSchoolYear")?.value || inferSchoolYear();
+        await importIcsFile(file, { zone, schoolYear });
+        // reset input pour permettre re-import du même fichier si besoin
+        icsFile.value = "";
+      }catch(err){
+        alert(`Import .ics impossible : ${err?.message || "erreur inconnue"}`);
       }
     });
   }
@@ -1753,6 +2059,12 @@ function bindUI(){
   if (btnClear){
     btnClear.addEventListener("click", ()=>{
       if (!confirm("Effacer transactions et ajustements ?")) return;
+      if (window.bootstrap?.Tooltip){
+        for (const tr of Array.from(body.children)){
+          const inst = bootstrap.Tooltip.getInstance(tr);
+          if (inst) inst.dispose();
+        }
+      }
       state.transactions = [];
       state.manual = {};
       buildCategoryTables();
@@ -1772,6 +2084,13 @@ document.addEventListener("DOMContentLoaded", ()=>{
   buildCategoryTables();
   renderTransactions();
   bindUI();
+  // Migration: si un ancien texte existe (textarea caché), on le convertit en table une fois
+  const legacy = $("periodBreaks")?.value || "";
+  if (legacy.trim()){
+    renderBreaksTable(breaksFromText(legacy));
+  }else{
+    renderBreaksTable([]); // initialise table vide
+  }
   recalcAll();
 });
 
