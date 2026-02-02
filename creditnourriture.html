@@ -701,6 +701,7 @@
               <tr>
                 <th style="width: 90px;">Domaine</th>
                 <th style="width: 110px;">Activité</th>
+                <th style="width: 110px;">Type</th>
                 <th style="width: 90px;">Compte</th>
                 <th>Libellé</th>
                 <th class="text-end" style="width: 140px;">Réalisé</th>
@@ -711,6 +712,37 @@
               <tr><td colspan="6" class="text-muted">Aucune donnée B4.1.1. Importez un collage SRH.</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Contrôle sous-totaux "." / "-" -->
+        <div class="mt-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="fw-semibold"><i class="bi bi-shield-check me-2"></i>Contrôle : Somme des comptes vs sous-totaux ( . / - )</div>
+            <button class="btn btn-sm btn-outline-secondary" id="btnB411Check">
+              <i class="bi bi-search me-1"></i>Lancer contrôle
+            </button>
+          </div>
+          <div class="form-text">
+            Compare, par Domaine/Activité, la somme des lignes comptes (6/7) avec les lignes sous-totales importées (compte = <span class="mono">.</span> ou <span class="mono">-</span>).
+          </div>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead>
+                <tr>
+                  <th style="width: 90px;">Domaine</th>
+                  <th style="width: 110px;">Activité</th>
+                  <th style="width: 110px;">Type</th>
+                  <th class="text-end" style="width: 140px;">Somme comptes</th>
+                  <th class="text-end" style="width: 140px;">Sous-total (./-)</th>
+                  <th class="text-end" style="width: 140px;">Écart</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody id="b411CheckBody">
+                <tr><td colspan="7" class="text-muted">Aucun contrôle effectué.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="form-text mt-2">
@@ -1881,6 +1913,21 @@ function b411LabelFromRow(r){
   return lbl || "";
 }
 
+function rowTypeFromRow(r){
+  // Détermine Recette/Dépense même pour "." et "-"
+  const acc = String(r?.account || "");
+  if (/^\d{6}$/.test(acc)) return acc.startsWith("7") || acc.startsWith("744") ? "RECETTE" : "DEPENSE";
+  const major = String(r?.cgrMajor || "").toUpperCase();
+  // Heuristique : ces majeures sont des dépenses
+  if (["DENREE","VIAB","ENTRET","MCO","DIVERS","REVERS"].includes(major)) return "DEPENSE";
+  return "RECETTE";
+}
+
+function typeBadgeHtml(type){
+  if (type === "RECETTE") return `<span class="badge text-bg-success">Recette</span>`;
+  return `<span class="badge text-bg-secondary">Dépense</span>`;
+}
+
 function addB411Line({ domaine, activite, compte, label, prev, real }){
   const key = `${domaine}|${activite}|${compte}`;
   if (!state.b411.lines[key]){
@@ -1991,7 +2038,7 @@ function renderB411LinesTable(){
   // Rendu
   body.innerHTML = "";
   if (!rows.length){
-    body.innerHTML = `<tr><td colspan="6" class="text-muted">Aucune ligne ne correspond aux filtres.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="text-muted">Aucune ligne ne correspond aux filtres.</td></tr>`;
     return;
   }
 
@@ -2009,6 +2056,7 @@ function renderB411LinesTable(){
     tr.innerHTML = `
       <td class="mono">${escapeHtml(r.domaine||"")}</td>
       <td class="mono">${escapeHtml(r.activite||"")}</td>
+      <td>${typeBadgeHtml(type)} ${isOrphan ? `<span class="badge text-bg-warning ms-1" title="Activité non déterminée">Orpheline</span>` : ""}</td>
       <td class="mono">${escapeHtml(r.compte||"")}</td>
       <td>${escapeHtml(r.label||"")}</td>
       <td class="text-end">${FR.fmtMoney(r.totalReal||0)}</td>
@@ -2034,6 +2082,83 @@ function downloadJson(filename, obj){
   a.click();
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 500);
+}
+
+/* ==============================
+  Contrôle: Somme comptes vs sous-totaux "." / "-"
+  - nécessite de conserver les "raw rows" du dernier import SRH
+============================== */
+function buildB411CheckTable(){
+  const body = $("b411CheckBody");
+  if (!body) return;
+  const raw = state.b411?.lastImportRows || [];
+  if (!raw.length){
+    body.innerHTML = `<tr><td colspan="7" class="text-muted">Aucun import SRH en mémoire pour contrôle.</td></tr>`;
+    return;
+  }
+
+  // Agrégation par Domaine|Activité|Type
+  const map = new Map();
+  const keyOf = (d,a,t)=>`${d}|${a}|${t}`;
+  const ensure = (d,a,t)=>{
+    const k = keyOf(d,a,t);
+    if (!map.has(k)){
+      map.set(k, { domaine:d, activite:a, type:t, sumAccPrev:0, sumAccReal:0, subPrev:0, subReal:0 });
+    }
+    return map.get(k);
+  };
+
+  for (const r of raw){
+    const domaine = b411DomainFromRow(r);
+    const activite = b411ActivityFromRow(r);
+    const type = rowTypeFromRow(r); // robust pour . / -
+    const acc = String(r.account||"");
+    const e = ensure(domaine, activite, type);
+
+    if (/^\d{6}$/.test(acc)){
+      e.sumAccPrev += Number(r.prev||0);
+      e.sumAccReal += Number(r.real||0);
+    } else if (acc === "." || acc === "-"){
+      e.subPrev += Number(r.prev||0);
+      e.subReal += Number(r.real||0);
+    }
+  }
+
+  const rows = Array.from(map.values())
+    .filter(x => (Math.abs(x.subPrev) > 0 || Math.abs(x.subReal) > 0 || Math.abs(x.sumAccPrev) > 0 || Math.abs(x.sumAccReal) > 0))
+    .sort((a,b)=>{
+      const d = String(a.domaine).localeCompare(String(b.domaine)); if (d) return d;
+      const aa = String(a.activite).localeCompare(String(b.activite)); if (aa) return aa;
+      return String(a.type).localeCompare(String(b.type));
+    });
+
+  if (!rows.length){
+    body.innerHTML = `<tr><td colspan="7" class="text-muted">Rien à contrôler (pas de sous-totaux ./- ou pas de lignes comptes).</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = "";
+  for (const r of rows){
+    // contrôle sur prévision (le plus important pour vote) + note
+    const deltaPrev = (r.sumAccPrev - r.subPrev);
+    const deltaReal = (r.sumAccReal - r.subReal);
+    const hasSub = Math.abs(r.subPrev) > 0 || Math.abs(r.subReal) > 0;
+    const note = hasSub
+      ? (Math.abs(deltaPrev) < 0.01 ? "OK (prévision)" : "Écart (prévision) – vérifier le collage ou les sous-totaux")
+      : "Pas de sous-total";
+    const deltaShown = FR.fmtMoney(deltaPrev);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="mono">${escapeHtml(r.domaine)}</td>
+      <td class="mono">${escapeHtml(r.activite)}</td>
+      <td>${typeBadgeHtml(r.type)}</td>
+      <td class="text-end">${FR.fmtMoney(r.sumAccPrev)}</td>
+      <td class="text-end">${FR.fmtMoney(r.subPrev)}</td>
+      <td class="text-end">${escapeHtml(deltaShown)}</td>
+      <td>${escapeHtml(note)}${Math.abs(deltaReal) > 0.01 ? ` (réalisé écart ${FR.fmtMoney(deltaReal)})` : ""}</td>
+    `;
+    body.appendChild(tr);
+  }
 }
 
 /* ==============================
@@ -2080,8 +2205,9 @@ function mapSrhToSimpleCategory(row){
   return null;
 }
 
-function applySrhToManualTables(rows, { overwrite=true } = {}){
+function applySrhToManualTables(rows, { overwrite=true, useDashWhenNoDetails=false } = {}){
   const sums = {}; // catId -> {real, prev}
+  const byActDetail = {}; // `${domain}|${act}|${type}` -> {hasDetails:boolean, sumPrev,sumReal, dashPrev,dashReal}
   const add = (cat, real, prev)=>{
     if (!cat) return;
     if (!sums[cat]) sums[cat] = { real:0, prev:0 };
@@ -2089,10 +2215,46 @@ function applySrhToManualTables(rows, { overwrite=true } = {}){
     sums[cat].prev += Number(prev||0);
   };
   for (const r of (rows||[])){
+
+  const bucketKey = (r)=>{
+    const d = b411DomainFromRow(r);
+    const a = b411ActivityFromRow(r);
+    const t = rowTypeFromRow(r);
+    return `${d}|${a}|${t}`;
+  };
+
+  // 1er passage: détails comptes 6/7 + collecte dash
     const acc = String(r.account||"");
-    if (acc === "." || acc === "-") continue; // pas de totaux
-    const cat = mapSrhToSimpleCategory(r);
-    add(cat, r.real, r.prev);
+    const k = bucketKey(r);
+    if (!byActDetail[k]) byActDetail[k] = { hasDetails:false, sumPrev:0, sumReal:0, dashPrev:0, dashReal:0 };
+
+    if (/^\d{6}$/.test(acc)){
+      byActDetail[k].hasDetails = true;
+      byActDetail[k].sumPrev += Number(r.prev||0);
+      byActDetail[k].sumReal += Number(r.real||0);
+      const cat = mapSrhToSimpleCategory(r);
+      add(cat, r.real, r.prev);
+      continue;
+    }
+
+    if (acc === "-" ){
+      byActDetail[k].dashPrev += Number(r.prev||0);
+      byActDetail[k].dashReal += Number(r.real||0);
+      continue;
+    }
+  }
+
+  // 2e passage: utilisation conditionnelle des "-" quand pas de détail
+  if (useDashWhenNoDetails){
+    for (const [k, v] of Object.entries(byActDetail)){
+      if (!v.hasDetails && (Math.abs(v.dashPrev)>0 || Math.abs(v.dashReal)>0)){
+        // reconstitue un row minimal depuis la clé
+        const [dom, act, type] = k.split("|");
+        const fake = { account:"-", cgrMajor: dom==="VIAB" ? "VIAB" : (dom==="REVERS"?"REVERS":"SRH"), cgrDetail: act, label:"Sous-total", prev:v.dashPrev, real:v.dashReal };
+        const cat = mapSrhToSimpleCategory(fake);
+        add(cat, v.dashReal, v.dashPrev);
+      }
+    }
   }
   for (const [catId, v] of Object.entries(sums)){
     if (!state.manual[catId]) state.manual[catId] = { real:0, prev:0 };
@@ -2110,14 +2272,18 @@ function applySrhToManualTables(rows, { overwrite=true } = {}){
 function buildB411FromSRHPaste(rows, { overwrite=true } = {}){
   ensureB411Defaults();
   if (overwrite) state.b411.lines = {};
+  // conserve toutes les rows du dernier import (y compris "-") pour contrôle
+  state.b411.lastImportRows = Array.isArray(rows) ? rows.slice() : [];
 
   // 1) Pilotage simplifié (tes tableaux)
-  applySrhToManualTables(rows, { overwrite });
+  //    Inclut les lignes "-" UNIQUEMENT si aucun détail (comptes 6/7) pour la même activité,
+  //    ce qui répond au besoin "montant dépenses quand seules lignes = -".
+  applySrhToManualTables(rows, { overwrite, useDashWhenNoDetails:true });
 
   // 2) B4.1.1 normalisé (clé: domaine|activité|compte)
   for (const r of (rows||[])){
     const acc = String(r.account||"");
-    if (!/^\d{6}$/.test(acc)) continue; // on ne prend pas "." / "-" / autres
+    if (!/^\d{6}$/.test(acc)) continue; // on ne prend pas "-" / autres
     const domaine = b411DomainFromRow(r);
     const activite = b411ActivityFromRow(r);
     const label = b411LabelFromRow(r);
@@ -2889,6 +3055,13 @@ function bindUI(){
     });
   }
 
+  const btnB411Check = $("btnB411Check");
+  if (btnB411Check){
+    btnB411Check.addEventListener("click", ()=>{
+      buildB411CheckTable();
+    });
+  }
+
   const btnConfirm = $("btnConfirmImportSrh");
   if (btnConfirm){
     btnConfirm.addEventListener("click", ()=>{
@@ -2900,6 +3073,7 @@ function bindUI(){
       // NEW: alimente tableaux simplifiés + structure B4.1.1
       buildB411FromSRHPaste(rows, { overwrite:true });
       refreshB411LinesUI();
+      buildB411CheckTable();
 
       // Optionnel : conserver les transactions pour audit (si tu veux)
       // applySrhPasteRows(rows);
