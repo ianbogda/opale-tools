@@ -349,12 +349,84 @@
                         <input type="file" class="form-control" id="clcaFile" accept=".xlsx,.xls,.csv">
                         <div class="form-text">Utilisé surtout pour les dépenses (engagé / consommé) + libellés/fournisseurs.</div>
                       </div>
-                      <div class="col-12 col-lg-6">
-                        <label class="form-label">Import restitution budget SRH (XLSX/CSV)</label>
-                        <input type="file" class="form-control" id="budgetFile" accept=".xlsx,.xls,.csv">
-                        <div class="form-text">Utilisé pour consolidé réalisé/prévision (consommé, engagé, budget/PR, etc.).</div>
+
+                      <!-- SRH via collage + preview -->
+                      <div class="col-12">
+                        <div class="border rounded-3 p-3 bg-light">
+                          <div class="fw-semibold mb-2"><i class="bi bi-clipboard-plus me-2"></i>SRH (coller un tableau)</div>
+                          <textarea class="form-control mono" id="srhPaste" rows="8"
+                            placeholder="Copiez/collez ici la restitution SRH depuis Op@le (lignes SRH + comptes 6/7)."></textarea>
+                          <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPreviewSrhPaste">
+                              <i class="bi bi-eye me-1"></i>Prévisualiser
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="btnImportSrhPaste">
+                              <i class="bi bi-cloud-arrow-down me-1"></i>Importer
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSrhPaste">
+                              <i class="bi bi-eraser me-1"></i>Vider
+                            </button>
+                          </div>
+                          <div class="form-text mt-2">
+                            Flux recommandé : <b>Prévisualiser</b> → vérifier → <b>Importer</b>.
+                          </div>
+                        </div>
                       </div>
 
+                      <!-- Modal: SRH Preview -->
+                      <div class="modal fade" id="srhPreviewModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title"><i class="bi bi-table me-2"></i>Prévisualisation SRH</h5>
+                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                            </div>
+                            <div class="modal-body">
+                              <div class="row g-2 mb-2">
+                                <div class="col-12 col-lg-4">
+                                  <div class="small text-muted">Lignes détectées</div>
+                                  <div class="h5 mb-0" id="srhPrevCount">—</div>
+                                </div>
+                                <div class="col-12 col-lg-4">
+                                  <div class="small text-muted">Total réalisé</div>
+                                  <div class="h5 mb-0" id="srhPrevTotReal">—</div>
+                                </div>
+                                <div class="col-12 col-lg-4">
+                                  <div class="small text-muted">Total prévision</div>
+                                  <div class="h5 mb-0" id="srhPrevTotPrev">—</div>
+                                </div>
+                              </div>
+
+                              <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-0">
+                                  <thead>
+                                    <tr>
+                                      <th>#</th>
+                                      <th>Compte</th>
+                                      <th>Type</th>
+                                      <th>Libellé</th>
+                                      <th class="text-end">Réalisé</th>
+                                      <th class="text-end">Prévision</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody id="srhPreviewBody">
+                                    <tr><td colspan="6" class="text-muted">Aucune donnée.</td></tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div class="form-text mt-2" id="srhPrevHint">
+                                Aperçu limité aux 200 premières lignes (si plus).
+                              </div>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                              <button type="button" class="btn btn-primary" id="btnConfirmImportSrh">
+                                <i class="bi bi-check2-circle me-1"></i>Importer ces lignes
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       <div class="col-12">
                         <div class="alert alert-light border mb-0">
                           <div class="fw-semibold mb-1"><i class="bi bi-wrench-adjustable me-1"></i>Mapping des colonnes)</div>
@@ -391,37 +463,6 @@
                           </div>
                           <div class="form-text mt-2">
                             Si “statut” est vide : l’outil classe en “réalisé” par défaut.
-                          </div>
-                        </div>
-                      </div>
-
-                      <div class="col-12 col-lg-6">
-                        <div class="border rounded-3 p-3 bg-light">
-                          <div class="fw-semibold mb-2">Mapping Budget SRH</div>
-                          <div class="row g-2">
-                            <div class="col-6">
-                              <label class="form-label">Nature/Compte (option)</label>
-                              <select class="form-select" id="mapBudKey"></select>
-                            </div>
-                            <div class="col-6">
-                              <label class="form-label">Libellé (option)</label>
-                              <select class="form-select" id="mapBudLabel"></select>
-                            </div>
-                            <div class="col-6">
-                              <label class="form-label">Réalisé (consommé/mandaté)</label>
-                              <select class="form-select" id="mapBudReal"></select>
-                            </div>
-                            <div class="col-6">
-                              <label class="form-label">Prévision (budget / PR / engagé)</label>
-                              <select class="form-select" id="mapBudPrev"></select>
-                            </div>
-                            <div class="col-12">
-                              <label class="form-label">Type (Recette/Dépense) (option)</label>
-                              <select class="form-select" id="mapBudType"></select>
-                            </div>
-                          </div>
-                          <div class="form-text mt-2">
-                            Si “type” est absent : les règles de mots-clés feront le classement.
                           </div>
                         </div>
                       </div>
@@ -537,6 +578,143 @@
               VIAB détaillée : eau, gaz, électricité, chauffage urbain (auto via mots-clés, ajustable).
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+    <!-- NEW: Constantes B4.1.1 (vote budget) -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-journal-text me-2"></i>Constantes B4.1.1 (préparation vote budget)</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12 col-lg-3">
+            <label class="form-label">Nb jours</label>
+            <input type="number" class="form-control" id="b411NbJours" min="0" step="1">
+            <div class="form-text">Utilisé pour les calculs unitaires (si activés ensuite).</div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <label class="form-label">% Fonctionnement</label>
+            <input type="number" class="form-control" id="b411PctFonct" min="0" max="100" step="0.1">
+            <div class="form-text">Ex: 25 = 25% des recettes affectées.</div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <label class="form-label">% Reversement CT</label>
+            <input type="number" class="form-control" id="b411PctRevers" min="0" max="100" step="0.1">
+            <div class="form-text">Ex: 25 = 25% des recettes affectées.</div>
+          </div>
+          <div class="col-12 col-lg-3 d-grid">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-outline-primary" id="btnB411Recalc">
+              <i class="bi bi-calculator me-1"></i>Recalculer B4.1.1
+            </button>
+          </div>
+
+          <div class="col-12">
+            <div class="alert alert-light border mb-0">
+              <div class="fw-semibold mb-1"><i class="bi bi-info-circle me-1"></i>Principe</div>
+              <div class="small text-muted">
+                L’import SRH (collage) alimente automatiquement :
+                <span class="mono">1) vos tableaux simplifiés</span> (pilotage) et <span class="mono">2) une structure B4.1.1</span> (vote).
+              </div>
+            </div>
+          </div>
+
+          <!-- mini synthèse B4.1.1 -->
+          <div class="col-12 col-lg-4">
+            <div class="kpi">
+              <div class="small text-muted">B4.1.1 – Total recettes (prévision)</div>
+              <div class="h4 mb-0" id="b411KpiRecPrev">—</div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="kpi">
+              <div class="small text-muted">B4.1.1 – Reversement CT (prévision)</div>
+              <div class="h4 mb-0" id="b411KpiReversPrev">—</div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="kpi">
+              <div class="small text-muted">B4.1.1 – Fonctionnement (prévision)</div>
+              <div class="h4 mb-0" id="b411KpiFonctPrev">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEW: B4.1.1 - lignes générées (validation avant export) -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div><i class="bi bi-table me-2"></i>B4.1.1 – lignes générées</div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" id="btnB411Refresh">
+            <i class="bi bi-arrow-clockwise me-1"></i>Rafraîchir
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" id="btnB411ExportJson">
+            <i class="bi bi-braces me-1"></i>Exporter JSON
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-lg-3">
+            <label class="form-label">Domaine</label>
+            <select class="form-select" id="b411FilterDomain">
+              <option value="">Tous</option>
+            </select>
+          </div>
+          <div class="col-12 col-lg-3">
+            <label class="form-label">Activité</label>
+            <select class="form-select" id="b411FilterActivity">
+              <option value="">Toutes</option>
+            </select>
+          </div>
+          <div class="col-12 col-lg-4">
+            <label class="form-label">Recherche</label>
+            <input class="form-control" id="b411Search" placeholder="Compte, libellé…">
+          </div>
+          <div class="col-12 col-lg-2 d-grid">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-outline-primary" id="btnB411ClearFilters">
+              <i class="bi bi-x-circle me-1"></i>Réinitialiser
+            </button>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-2">
+          <div class="col-12 col-lg-4">
+            <div class="small text-muted">Lignes affichées</div>
+            <div class="h5 mb-0" id="b411LinesCount">—</div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="small text-muted">Total Réalisé (filtre)</div>
+            <div class="h5 mb-0" id="b411LinesTotReal">—</div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="small text-muted">Total Prévision (filtre)</div>
+            <div class="h5 mb-0" id="b411LinesTotPrev">—</div>
+          </div>
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-bordered align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width: 90px;">Domaine</th>
+                <th style="width: 110px;">Activité</th>
+                <th style="width: 90px;">Compte</th>
+                <th>Libellé</th>
+                <th class="text-end" style="width: 140px;">Réalisé</th>
+                <th class="text-end" style="width: 140px;">Prévision</th>
+              </tr>
+            </thead>
+            <tbody id="b411LinesBody">
+              <tr><td colspan="6" class="text-muted">Aucune donnée B4.1.1. Importez un collage SRH.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="form-text mt-2">
+          Cette liste correspond à <span class="mono">state.b411.lines</span> (agrégée par Domaine / Activité / Compte).
         </div>
       </div>
     </div>
@@ -1126,6 +1304,371 @@ function escapeHtml(s){
 }
 
 /* ==============================
+  2) Classement auto SRH -> catégories crédit nourriture
+  - utilise en priorité cgrMajor/cgrDetail
+  - fallback sur mots-clés existants via classifyTransaction()
+============================== */
+function srhSuggestCategoryId(row, type){
+  const major = String(row?.cgrMajor || "").toUpperCase();
+  const detail = String(row?.cgrDetail || "").toUpperCase();
+  const acc = String(row?.account || "");
+
+  if (type === "DEPENSE"){
+    // VIAB
+    if (major === "VIAB"){
+      if (detail.includes("EAU")) return "DEP_VIAB_EAU";
+      if (detail.includes("GAZ")) return "DEP_VIAB_GAZ";
+      if (detail.includes("ELEC")) return "DEP_VIAB_ELEC";
+      if (detail.includes("URB") || detail.includes("CHAUD")) return "DEP_VIAB_CHAUD";
+      return "DEP_OBLIG";
+    }
+    // Denrées
+    if (major === "DENREE") return "DEP_DENREES";
+    // Entretien / MCO / Divers -> charges obligatoires (pilotage)
+    if (["ENTRET","MCO","DIVERS"].includes(major)) return "DEP_OBLIG";
+    // fallback: 601xxx souvent denrées
+    if (acc.startsWith("601")) return "DEP_DENREES";
+    return null;
+  }
+
+  // RECETTE
+  // Quelques conventions SRH fréquentes dans ton extrait
+  if (detail.includes("0INT")) return "REC_INTERNES";
+  if (detail.includes("0COMM")) return "REC_COMMENSAUX";
+  if (detail.includes("0HEBERGE") || detail.includes("0NUIT")) return "REC_LOCATION";
+  if (detail.includes("0SNACK") || detail.includes("0PRODANX")) return "REC_ANNEXES";
+  if (detail.includes("0REPASCFA")) return "REC_EXTERIEURS";
+  if (detail.includes("0ELEVES")) return "REC_TICKETS"; // approximation raisonnable (à affiner si tu veux)
+
+  // fallback: 70623x autres tiers => extérieurs
+  if (acc.startsWith("70623")) return "REC_EXTERIEURS";
+  // 744xxx subventions => annexe (ou location selon ton pilotage)
+  if (acc.startsWith("744")) return "REC_ANNEXES";
+  return null;
+}
+
+/* ==============================
+  3) Alertes de cohérence (CGR vs n° de compte)
+  - Exemple: compte 7xxx (recette) rangé sous DENREE/VIAB => warning
+============================== */
+function buildSrhWarnings(rows){
+  const warns = [];
+  for (const r of (rows||[])){
+    const acc = String(r.account||"");
+    const major = String(r.cgrMajor||"").toUpperCase();
+    const isRec = acc.startsWith("7");
+    const isDep = acc.startsWith("6");
+    const majorDep = ["DENREE","VIAB","ENTRET","MCO","DIVERS"].includes(major);
+    const majorRec = ["REVERS","EGALIM"].includes(major); // à ajuster si tu as d'autres CGR recettes
+
+    if (isRec && majorDep){
+      warns.push(`Compte ${acc} (recette) sous CGR ${major} → vérifier le collage / la restitution.`);
+    }
+    if (isDep && majorRec){
+      warns.push(`Compte ${acc} (dépense) sous CGR ${major} → vérifier le collage / la restitution.`);
+    }
+  }
+  // dédoublonnage simple
+  return Array.from(new Set(warns)).slice(0, 8);
+}
+
+/* ==============================
+  SRH Preview helpers
+============================== */
+function computeSrhPreviewTotals(rows){
+  let totReal = 0, totPrev = 0;
+  for (const r of (rows||[])){
+    totReal += Number(r.real||0);
+    totPrev += Number(r.prev||0);
+  }
+  return { totReal, totPrev };
+}
+
+function renderSrhPreview(rows){
+  const body = $("srhPreviewBody");
+  if (!body) return;
+  body.innerHTML = "";
+
+  const limited = (rows||[]).slice(0, 200);
+  if (!limited.length){
+    body.innerHTML = `<tr><td colspan="6" class="text-muted">Aucune ligne compte 6/7 détectée.</td></tr>`;
+    return;
+  }
+
+  // 4) Regroupement visuel: on insère une ligne "header" à chaque changement de CGR
+  let lastGroup = "";
+  for (let i=0; i<limited.length; i++){
+    const r = limited[i];
+    const group = String(r.cgrPath || "SRH");
+    if (group !== lastGroup){
+      lastGroup = group;
+      const trH = document.createElement("tr");
+      trH.className = "table-light";
+      trH.innerHTML = `
+        <td colspan="6" class="fw-semibold">
+          <i class="bi bi-folder2-open me-1"></i>${escapeHtml(group)}
+        </td>`;
+      body.appendChild(trH);
+    }
+
+    const type = String(r.account||"").startsWith("7") ? "RECETTE" : "DEPENSE";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="mono">${i+1}</td>
+      <td class="mono">${escapeHtml(r.account||"")}</td>
+      <td>${type === "RECETTE"
+        ? `<span class="badge text-bg-success">Recette</span>`
+        : `<span class="badge text-bg-secondary">Dépense</span>`}
+      </td>
+      <td>
+        <div class="small text-muted">${escapeHtml(r.cgrPath||"SRH")}</div>
+        <div>${escapeHtml(r.label||"")}</div>
+      </td>
+      <td class="text-end">${FR.fmtMoney(r.real||0)}</td>
+      <td class="text-end">${FR.fmtMoney(r.prev||0)}</td>
+    `;
+    body.appendChild(tr);
+  }
+
+  if ((rows||[]).length > limited.length){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="6" class="text-muted">Aperçu limité à ${limited.length} lignes (sur ${(rows||[]).length}).</td>`;
+    body.appendChild(tr);
+  }
+}
+
+/* ==============================
+  SRH paste import (tableau collé) + CGR SRH
+  - Capture le contexte des lignes "SRH ..." (CGR) et l'applique aux comptes.
+  - Heuristique colonnes (Op@le restitution):
+      * récupère tous les montants sur la ligne
+      * prend les 5 derniers si possible : [0]=Prévision (Budget/PR), [1]=Réalisé, [2]=Engagé...
+      * real = [1] sinon [2], prev = [0]
+============================== */
+function parseSrhPasteToRows(text){
+  const out = [];
+  const lines = String(text || "").split(/\r?\n/);
+  let currentMajor = "";   // ex: DENREE, VIAB, DIVERS...
+  let currentDetail = "";  // ex: 0DENR, 0EAU, 0COMM...
+  let currentRaw = "";     // ex: ligne SRH brute
+
+  for (const raw of lines){
+    const line = raw.trim();
+    if (!line) continue;
+
+    // -------------------------------------------------
+    // 1) Lignes de regroupement SRH (contexte)
+    // -------------------------------------------------
+    if (line.startsWith("SRH")){
+      currentRaw = line;
+      const clean = line.replace(/\s+/g, " ").trim();
+      // Retire "SRH" puis coupe avant " - "
+      const left = clean.replace(/^SRH\s+/i, "").split(" - ")[0].trim();
+      const parts = left.split(" ").filter(Boolean);
+      currentMajor  = parts[0] || "";
+      currentDetail = parts[1] || "";
+  
+      // --- NOUVEAU: intégrer les lignes "dot" (compte = ".") si elles portent des montants
+      // Ex: "SRH . 0COMM - _   6 276,00 653,70 ..."
+      const moneyMatches = clean.match(/-?\d[\d\s\u00A0\u202F]*,\d{2}/g) || [];
+      const nums = moneyMatches.map(v => FR.parseMoney(v)).filter(n => Number.isFinite(n));
+      if (nums.length){
+        // Détection d'un "compte" point (.)
+        // On accepte: "SRH ." ou "SRH .... . ...."
+        const hasDotAccount = /\b\.\b/.test(clean) || clean.includes(" . ");
+        if (hasDotAccount){
+          // bloc montants à droite
+          const block = (nums.length >= 5) ? nums.slice(-5) : nums.slice(-2);
+          let prev = 0, real = 0;
+          if (block.length >= 5){
+            prev = block[0] || 0;
+            real = (Math.abs(block[1]) > 0) ? block[1] : (block[2] || 0);
+          } else {
+            prev = block[0] || 0;
+            real = block[1] || 0;
+          }
+
+          // Libellé = partie texte SRH avant le 1er montant
+          // On prend ce qui suit "SRH" et on coupe avant le premier montant
+          let labelPart = clean.replace(/^SRH\s+/i, "");
+          labelPart = labelPart.split(/-?\d[\d\s\u00A0\u202F]*,\d{2}/)[0];
+          labelPart = labelPart.replace(/\s+/g," ").trim();
+
+          // Contexte CGR (lisible)
+          let cgrPath = "SRH";
+          if (currentMajor) cgrPath += ` > ${currentMajor}`;
+          if (currentDetail) cgrPath += ` > ${currentDetail}`;
+
+          out.push({
+            account: ".",
+            label: labelPart,      // libellé "pur" (sans montants)
+            cgrMajor: currentMajor,
+            cgrDetail: currentDetail,
+            cgrPath,
+            cgrRaw: currentRaw,
+            real,
+            prev,
+            isDot: true
+          });
+        }
+      }
+      continue;
+    }
+
+    // -------------------------------------------------
+    // NOUVEAU: lignes de sous-total "-” (sans n° de compte)
+    // Ex:
+    //    " -"
+    // ou " -  92 254,47  0,00  0,00  0,00  92 254,47"
+    // -------------------------------------------------
+    if (/^-\s*$/.test(line) || /^-\s+/.test(line)){
+      // On extrait les montants s'il y en a (sinon on ignore la ligne, car rien à importer)
+      const moneyMatches = line.match(/-?\d[\d\s\u00A0\u202F]*,\d{2}/g) || [];
+      const nums = moneyMatches.map(v => FR.parseMoney(v)).filter(n => Number.isFinite(n));
+      if (nums.length){
+        const block = (nums.length >= 5) ? nums.slice(-5) : nums.slice(-2);
+        let prev = 0, real = 0;
+        if (block.length >= 5){
+          prev = block[0] || 0;
+          real = (Math.abs(block[1]) > 0) ? block[1] : (block[2] || 0);
+        } else {
+          prev = block[0] || 0;
+          real = block[1] || 0;
+        }
+
+        let cgrPath = "SRH";
+        if (currentMajor) cgrPath += ` > ${currentMajor}`;
+        if (currentDetail) cgrPath += ` > ${currentDetail}`;
+
+        // libellé lisible
+        const label = "Sous-total";
+
+        out.push({
+          account: "-",
+          label,
+          cgrMajor: currentMajor,
+          cgrDetail: currentDetail,
+          cgrPath,
+          cgrRaw: currentRaw,
+          real,
+          prev,
+          isDash: true
+        });
+      }
+      continue;
+    }
+
+    // On ne garde que les lignes contenant un compte 6 chiffres (souvent précédé d'une tabulation)
+    const mAcc = line.match(/(?:^|\s)(\d{6})\s*-\s*(.+)$/);
+    if (!mAcc) continue;
+
+    const account = mAcc[1];
+    // libellé brut (avant nettoyage des montants)
+    const labelRaw = mAcc[2];
+
+    // Extraction "souple" de tous les montants au format fr (inclut espaces fines)
+    const moneyMatches = line.match(/-?\d[\d\s\u00A0\u202F]*,\d{2}/g) || [];
+    const nums = moneyMatches.map(v => FR.parseMoney(v)).filter(n => Number.isFinite(n));
+    if (!nums.length) continue;
+
+    // bloc cible = 5 derniers (le plus à droite)
+    const block = (nums.length >= 5) ? nums.slice(-5) : nums.slice(-2);
+
+    let prev = 0;
+    let real = 0;
+    if (block.length >= 5){
+      prev = block[0] || 0;                 // Budget/PR
+      real = (Math.abs(block[1]) > 0) ? block[1] : (block[2] || 0); // Réalisé sinon Engagé
+    } else {
+      // fallback minimal : [prev, real] sur les 2 derniers
+      prev = block[0] || 0;
+      real = block[1] || 0;
+    }
+
+    // -------------------------------------------------
+    // Nettoyage strict du libellé :
+    // on conserve UNIQUEMENT la partie texte avant le 1er montant
+    // Ex: "REST.AUTRES TIERS  0,00  6 276,00" -> "REST.AUTRES TIERS"
+    // -------------------------------------------------
+    let label = String(labelRaw || "");
+
+    // coupe dès qu'un montant FR apparaît
+    label = label.split(/-?\d[\d\s\u00A0\u202F]*,\d{2}/)[0];
+
+    // nettoyage final
+    label = label.replace(/\s+/g, " ").trim();
+
+    // -------------------------------------------------
+    // 3) Enrichissement du libellé avec le contexte SRH
+    // -------------------------------------------------
+    // Contexte CGR (lisible)
+    let cgrPath = "SRH";
+    if (currentMajor) cgrPath += ` > ${currentMajor}`;
+    if (currentDetail) cgrPath += ` > ${currentDetail}`;
+
+    out.push({
+      account,
+      label,               // libellé comptable "pur"
+      cgrMajor: currentMajor,
+      cgrDetail: currentDetail,
+      cgrPath,
+      cgrRaw: currentRaw,
+      real,
+      prev
+    });
+  }
+  return out;
+}
+
+/* ==============================
+  Apply SRH paste rows -> transactions
+  - label enrichi avec CGR
+  - categoryId proposé via srhSuggestCategoryId()
+============================== */
+function applySrhPasteRows(rows){
+  for (const r of rows){
+    const acc = String(r.account || "");
+    const major = String(r.cgrMajor || "").toUpperCase();
+    const type =
+      acc === "-"
+        ? (["DENREE","VIAB","ENTRET","MCO","DIVERS"].includes(major) ? "DEPENSE" : "RECETTE")
+        : (acc.startsWith("7") ? "RECETTE" : "DEPENSE");
+    const cgrPrefix = String(r.cgrPath || "SRH");
+    const baseLabel = `[${cgrPrefix}] ${acc} - ${r.label || ""}`.trim();
+    const proposedCat = srhSuggestCategoryId(r, type);
+
+    if (r.real){
+      upsertTransaction(classifyTransaction({
+        id: `SRH_REAL_${state.transactions.length+1}`,
+        date: null,
+        type,
+        categoryId: proposedCat || null,
+        label: `[SRH] ${baseLabel}`,
+        vendor: "",
+        amount: Math.abs(Number(r.real || 0)),
+        statusKind: "consumed",
+        statusRaw: "srh_real",
+        source: "SRH_PASTE"
+      }));
+    }
+    if (r.prev){
+      upsertTransaction(classifyTransaction({
+        id: `SRH_PREV_${state.transactions.length+1}`,
+        date: null,
+        type,
+        categoryId: proposedCat || null,
+        label: `[SRH prévision] ${baseLabel}`,
+        vendor: "",
+        amount: Math.abs(Number(r.prev || 0)),
+        statusKind: "engaged",
+        statusRaw: "srh_prev",
+        source: "SRH_PASTE"
+      }));
+    }
+  }
+}
+
+/* ==============================
   STATE (exportable)
 ============================== */
 const state = {
@@ -1165,6 +1708,25 @@ const state = {
   ],
   manual: {
     // categoryId: { real: number, prev: number }
+  },
+  // NEW: B4.1.1 (vote budget) - structure normalisée
+  b411: {
+    constants: {
+      nbJours: 180,
+      pctFonctionnement: 25.0,
+      pctReversement: 25.0
+    },
+    // lines: clé = `${domaine}|${activite}|${compte}`
+    // valeur = { domaine, activite, compte, label, totalPrev, totalReal }
+    lines: {},
+    computed: {
+      totalRecPrev: 0,
+      totalRecReal: 0,
+      reversPrev: 0,
+      reversReal: 0,
+      fonctPrev: 0,
+      fonctReal: 0
+    }
   }
 };
 
@@ -1193,6 +1755,13 @@ function initDefaults(){
 
   if ($("rulesRevenue")) $("rulesRevenue").value = state.rules.revenue;
   if ($("rulesSpend")) $("rulesSpend").value = state.rules.spend;
+
+  // B4.1.1 UI defaults
+  ensureB411Defaults();
+  if ($("b411NbJours")) $("b411NbJours").value = state.b411.constants.nbJours;
+  if ($("b411PctFonct")) $("b411PctFonct").value = state.b411.constants.pctFonctionnement;
+  if ($("b411PctRevers")) $("b411PctRevers").value = state.b411.constants.pctReversement;
+  computeB411();
 }
 
 /* ==============================
@@ -1280,6 +1849,294 @@ function buildCategoryTables(){
 }
 
 /* ==============================
+  B4.1.1 helpers
+============================== */
+function ensureB411Defaults(){
+  if (!state.b411) {
+    state.b411 = { constants:{ nbJours:180, pctFonctionnement:25.0, pctReversement:25.0 }, lines:{}, computed:{} };
+  }
+  if (!state.b411.constants) state.b411.constants = { nbJours:180, pctFonctionnement:25.0, pctReversement:25.0 };
+  if (!state.b411.lines) state.b411.lines = {};
+  if (!state.b411.computed) state.b411.computed = {};
+}
+
+function b411DomainFromRow(r){
+  // Domaine "vote" : SRH / VIAB / REVERS (ajustable)
+  const major = String(r?.cgrMajor || "").toUpperCase();
+  if (major === "VIAB") return "VIAB";
+  if (major === "REVERS") return "REVERS";
+  return "SRH";
+}
+
+function b411ActivityFromRow(r){
+  // Activité: 0ELEVES, 0COMM, 0DENR, etc.
+  const a = String(r?.cgrDetail || "").trim();
+  return a || "0GEN";
+}
+
+function b411LabelFromRow(r){
+  // libellé propre (déjà nettoyé des montants)
+  const lbl = String(r?.label || "").trim();
+  // Si tu as enrichi le label plus haut, ça reste OK.
+  return lbl || "";
+}
+
+function addB411Line({ domaine, activite, compte, label, prev, real }){
+  const key = `${domaine}|${activite}|${compte}`;
+  if (!state.b411.lines[key]){
+    state.b411.lines[key] = {
+      domaine, activite, compte,
+      label,
+      totalPrev: 0,
+      totalReal: 0
+    };
+  }
+  state.b411.lines[key].totalPrev += Number(prev||0);
+  state.b411.lines[key].totalReal += Number(real||0);
+}
+
+function computeB411(){
+  ensureB411Defaults();
+  let recPrev = 0, recReal = 0;
+  // total recettes = comptes 7xxx dans SRH (et éventuellement subventions 744 si tu veux les compter comme recettes SRH)
+  for (const line of Object.values(state.b411.lines)){
+    const c = String(line.compte||"");
+    const isRec = c.startsWith("7") || c.startsWith("744"); // 744xxx = subventions, souvent côté recettes
+    if (isRec){
+      recPrev += Number(line.totalPrev||0);
+      recReal += Number(line.totalReal||0);
+    }
+  }
+  const pctF = Number(state.b411.constants.pctFonctionnement||0)/100.0;
+  const pctR = Number(state.b411.constants.pctReversement||0)/100.0;
+
+  state.b411.computed.totalRecPrev = recPrev;
+  state.b411.computed.totalRecReal = recReal;
+  state.b411.computed.fonctPrev = recPrev * pctF;
+  state.b411.computed.fonctReal = recReal * pctF;
+  state.b411.computed.reversPrev = recPrev * pctR;
+  state.b411.computed.reversReal = recReal * pctR;
+
+  // KPI UI
+  if ($("b411KpiRecPrev")) $("b411KpiRecPrev").textContent = FR.fmtMoney(state.b411.computed.totalRecPrev);
+  if ($("b411KpiReversPrev")) $("b411KpiReversPrev").textContent = FR.fmtMoney(state.b411.computed.reversPrev);
+  if ($("b411KpiFonctPrev")) $("b411KpiFonctPrev").textContent = FR.fmtMoney(state.b411.computed.fonctPrev);
+}
+
+/* ==============================
+  UI: B4.1.1 lignes générées
+============================== */
+function getB411LinesArray(){
+  ensureB411Defaults();
+  return Object.values(state.b411.lines || {});
+}
+
+function uniqSorted(arr){
+  return Array.from(new Set(arr.filter(Boolean))).sort((a,b)=>String(a).localeCompare(String(b)));
+}
+
+function fillSelectOptions(selectEl, values, placeholder){
+  if (!selectEl) return;
+  const current = selectEl.value;
+  selectEl.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = placeholder || "Tous";
+  selectEl.appendChild(opt0);
+  for (const v of values){
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    selectEl.appendChild(opt);
+  }
+  // restaure si possible
+  if ([...selectEl.options].some(o=>o.value===current)) selectEl.value = current;
+}
+
+function refreshB411Filters(){
+  const lines = getB411LinesArray();
+  const domains = uniqSorted(lines.map(x=>x.domaine));
+  const acts = uniqSorted(lines.map(x=>x.activite));
+  fillSelectOptions($("b411FilterDomain"), domains, "Tous");
+  fillSelectOptions($("b411FilterActivity"), acts, "Toutes");
+}
+
+function renderB411LinesTable(){
+  const body = $("b411LinesBody");
+  if (!body) return;
+  const domain = $("b411FilterDomain")?.value || "";
+  const activity = $("b411FilterActivity")?.value || "";
+  const q = String($("b411Search")?.value || "").trim().toLowerCase();
+
+  let rows = getB411LinesArray();
+  if (domain) rows = rows.filter(r => String(r.domaine||"") === domain);
+  if (activity) rows = rows.filter(r => String(r.activite||"") === activity);
+  if (q){
+    rows = rows.filter(r=>{
+      const s = `${r.domaine||""} ${r.activite||""} ${r.compte||""} ${r.label||""}`.toLowerCase();
+      return s.includes(q);
+    });
+  }
+
+  // Totaux filtrés
+  let totReal = 0, totPrev = 0;
+  for (const r of rows){
+    totReal += Number(r.totalReal||0);
+    totPrev += Number(r.totalPrev||0);
+  }
+  if ($("b411LinesCount")) $("b411LinesCount").textContent = String(rows.length);
+  if ($("b411LinesTotReal")) $("b411LinesTotReal").textContent = FR.fmtMoney(totReal);
+  if ($("b411LinesTotPrev")) $("b411LinesTotPrev").textContent = FR.fmtMoney(totPrev);
+
+  // Rendu
+  body.innerHTML = "";
+  if (!rows.length){
+    body.innerHTML = `<tr><td colspan="6" class="text-muted">Aucune ligne ne correspond aux filtres.</td></tr>`;
+    return;
+  }
+
+  // tri stable (domaine, activité, compte)
+  rows.sort((a,b)=>{
+    const da = String(a.domaine||"").localeCompare(String(b.domaine||""));
+    if (da) return da;
+    const aa = String(a.activite||"").localeCompare(String(b.activite||""));
+    if (aa) return aa;
+    return String(a.compte||"").localeCompare(String(b.compte||""));
+  });
+
+  for (const r of rows){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="mono">${escapeHtml(r.domaine||"")}</td>
+      <td class="mono">${escapeHtml(r.activite||"")}</td>
+      <td class="mono">${escapeHtml(r.compte||"")}</td>
+      <td>${escapeHtml(r.label||"")}</td>
+      <td class="text-end">${FR.fmtMoney(r.totalReal||0)}</td>
+      <td class="text-end">${FR.fmtMoney(r.totalPrev||0)}</td>
+    `;
+    body.appendChild(tr);
+  }
+}
+
+function refreshB411LinesUI(){
+  refreshB411Filters();
+  renderB411LinesTable();
+}
+
+function downloadJson(filename, obj){
+  const data = JSON.stringify(obj, null, 2);
+  const blob = new Blob([data], {type:"application/json;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 500);
+}
+
+/* ==============================
+  SRH -> Pilotage simplifié (tableaux) + B4.1.1
+  - On n'utilise PAS "." et "-" pour les totaux (évite double-comptage)
+============================== */
+function mapSrhToSimpleCategory(row){
+  // Version “pilotage” : catégories existantes
+  const major = String(row?.cgrMajor||"").toUpperCase();
+  const detail = String(row?.cgrDetail||"").toUpperCase();
+  const acc = String(row?.account||"");
+  const lbl = String(row?.label||"").toLowerCase();
+
+  // Dépenses
+  if (acc.startsWith("6")){
+    if (major === "VIAB"){
+      if (detail.includes("EAU")) return "DEP_VIAB_EAU";
+      if (detail.includes("GAZ")) return "DEP_VIAB_GAZ";
+      if (detail.includes("ELEC")) return "DEP_VIAB_ELEC";
+      if (detail.includes("URB") || detail.includes("CHAU")) return "DEP_VIAB_CHAUD";
+      return "DEP_OBLIG";
+    }
+    if (major === "DENREE" || acc.startsWith("601")) return "DEP_DENREES";
+    if (["ENTRET","MCO","DIVERS","REVERS","EGALIM"].includes(major)) return "DEP_OBLIG";
+    if (/eau/.test(lbl)) return "DEP_VIAB_EAU";
+    if (/gaz/.test(lbl)) return "DEP_VIAB_GAZ";
+    if (/(électric|electric|edf|kwh)/.test(lbl)) return "DEP_VIAB_ELEC";
+    if (/(chauffage urbain|réseau de chaleur|reseau de chaleur)/.test(lbl)) return "DEP_VIAB_CHAUD";
+    return "DEP_OBLIG";
+  }
+
+  // Recettes
+  if (acc.startsWith("7") || acc.startsWith("744")){
+    if (detail.includes("0INT")) return "REC_INTERNES";
+    if (detail.includes("0COMM")) return "REC_COMMENSAUX";
+    if (detail.includes("0ELEVES")) return "REC_TICKETS";
+    if (detail.includes("0HEBERGE") || detail.includes("0NUIT")) return "REC_LOCATION";
+    if (detail.includes("0SNACK") || detail.includes("0PRODANX")) return "REC_ANNEXES";
+    if (detail.includes("0REPASCFA") || acc.startsWith("70623")) return "REC_EXTERIEURS";
+    if (/recept/i.test(lbl)) return "REC_RECEPTIONS";
+    // fallback
+    return "REC_TICKETS";
+  }
+  return null;
+}
+
+function applySrhToManualTables(rows, { overwrite=true } = {}){
+  const sums = {}; // catId -> {real, prev}
+  const add = (cat, real, prev)=>{
+    if (!cat) return;
+    if (!sums[cat]) sums[cat] = { real:0, prev:0 };
+    sums[cat].real += Number(real||0);
+    sums[cat].prev += Number(prev||0);
+  };
+  for (const r of (rows||[])){
+    const acc = String(r.account||"");
+    if (acc === "." || acc === "-") continue; // pas de totaux
+    const cat = mapSrhToSimpleCategory(r);
+    add(cat, r.real, r.prev);
+  }
+  for (const [catId, v] of Object.entries(sums)){
+    if (!state.manual[catId]) state.manual[catId] = { real:0, prev:0 };
+    if (overwrite){
+      state.manual[catId].real = v.real;
+      state.manual[catId].prev = v.prev;
+    } else {
+      state.manual[catId].real += v.real;
+      state.manual[catId].prev += v.prev;
+    }
+  }
+  buildCategoryTables();
+}
+
+function buildB411FromSRHPaste(rows, { overwrite=true } = {}){
+  ensureB411Defaults();
+  if (overwrite) state.b411.lines = {};
+
+  // 1) Pilotage simplifié (tes tableaux)
+  applySrhToManualTables(rows, { overwrite });
+
+  // 2) B4.1.1 normalisé (clé: domaine|activité|compte)
+  for (const r of (rows||[])){
+    const acc = String(r.account||"");
+    if (!/^\d{6}$/.test(acc)) continue; // on ne prend pas "." / "-" / autres
+    const domaine = b411DomainFromRow(r);
+    const activite = b411ActivityFromRow(r);
+    const label = b411LabelFromRow(r);
+    addB411Line({
+      domaine,
+      activite,
+      compte: acc,
+      label,
+      prev: r.prev,
+      real: r.real
+    });
+  }
+
+  computeB411();
+  recalcAll();
+  saveLocalMaybe();
+}
+
+/* ==============================
   Import utilities (XLSX/CSV)
 ============================== */
 function readWorkbookFromFile(file){
@@ -1343,20 +2200,6 @@ function setupClcaMapping(headers){
   fillMappingSelect("mapClcaLabel", headers, prefLabel);
   fillMappingSelect("mapClcaStatus", headers, prefStatus);
   fillMappingSelect("mapClcaVendor", headers, prefVendor);
-}
-
-function setupBudgetMapping(headers){
-  const prefKey = state.mappings.budget.key || detectPreferred(headers,[/compte/,/nature/,/code/]);
-  const prefLabel = state.mappings.budget.label || detectPreferred(headers,[/libell/,/intitul/,/designation/]);
-  const prefReal = state.mappings.budget.real || detectPreferred(headers,[/consomm/,/mandat/,/réalis|realis/,/execu/]);
-  const prefPrev = state.mappings.budget.prev || detectPreferred(headers,[/budget/,/prévision|prevision/,/\bpr\b/,/engag/,/dotation/,/ouvert/]);
-  const prefType = state.mappings.budget.type || detectPreferred(headers,[/type/,/sens/,/recett/,/dépens|depens/,/charge/]);
-
-  fillMappingSelect("mapBudKey", headers, prefKey);
-  fillMappingSelect("mapBudLabel", headers, prefLabel);
-  fillMappingSelect("mapBudReal", headers, prefReal);
-  fillMappingSelect("mapBudPrev", headers, prefPrev);
-  fillMappingSelect("mapBudType", headers, prefType);
 }
 
 /* ==============================
@@ -1456,66 +2299,6 @@ function applyClcaRows(rows){
     });
 
     upsertTransaction(tx);
-  }
-}
-
-function applyBudgetRows(rows){
-  state.mappings.budget = {
-    key: $("mapBudKey")?.value || "",
-    label: $("mapBudLabel")?.value || "",
-    real: $("mapBudReal")?.value || "",
-    prev: $("mapBudPrev")?.value || "",
-    type: $("mapBudType")?.value || ""
-  };
-  const mb = state.mappings.budget;
-
-  for (const r of rows){
-    const key = mb.key ? String(r[mb.key]||"") : "";
-    const label = mb.label ? String(r[mb.label]||"") : (key || "");
-    const real = mb.real ? FR.parseMoney(r[mb.real]) : 0;
-    const prev = mb.prev ? FR.parseMoney(r[mb.prev]) : 0;
-    const typeRaw = mb.type ? String(r[mb.type]||"") : "";
-
-    if (!label && !key && !real && !prev) continue;
-
-    let type = null;
-    if (typeRaw){
-      const t = typeRaw.toLowerCase();
-      if (t.includes("rec")) type = "RECETTE";
-      if (t.includes("dep") || t.includes("dép") || t.includes("charge")) type = "DEPENSE";
-    }
-
-    if (real){
-      const txReal = classifyTransaction({
-        id: `BUD_REAL_${state.transactions.length+1}`,
-        date: null,
-        type,
-        categoryId: null,
-        label: `[Budget] ${label}`,
-        vendor: "",
-        amount: Math.abs(real),
-        statusKind: "consumed",
-        statusRaw: "budget_real",
-        source: "BUDGET"
-      });
-      upsertTransaction(txReal);
-    }
-
-    if (prev){
-      const txPrev = classifyTransaction({
-        id: `BUD_PREV_${state.transactions.length+1}`,
-        date: null,
-        type,
-        categoryId: null,
-        label: `[Budget prévision] ${label}`,
-        vendor: "",
-        amount: Math.abs(prev),
-        statusKind: "engaged",
-        statusRaw: "budget_prev",
-        source: "BUDGET"
-      });
-      upsertTransaction(txPrev);
-    }
   }
 }
 
@@ -1876,23 +2659,10 @@ async function handleCLCAImport(file){
   if ($("lastImport")) $("lastImport").value = `CLCA: ${file.name} (${headers.length} colonnes)`;
 }
 
-async function handleBudgetImport(file){
-  const wb = await readWorkbookFromFile(file);
-  const { rows } = sheetToRows(wb);
-  const headers = rows.length ? Object.keys(rows[0]) : [];
-  setupBudgetMapping(headers);
-  window.__budRows = rows;
-  if ($("lastImport")) $("lastImport").value = `Budget: ${file.name} (${headers.length} colonnes)`;
-}
-
 function applyPendingImports(){
   if (window.__clcaRows && window.__clcaRows.length){
     applyClcaRows(window.__clcaRows);
     window.__clcaRows = null;
-  }
-  if (window.__budRows && window.__budRows.length){
-    applyBudgetRows(window.__budRows);
-    window.__budRows = null;
   }
   reclassAll();
   saveLocalMaybe();
@@ -2026,19 +2796,155 @@ function bindUI(){
     });
   }
 
-  const budgetFile = $("budgetFile");
-  if (budgetFile){
-    budgetFile.addEventListener("change", async (e)=>{
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      try{ await handleBudgetImport(file); }
-      catch(err){ alert("Import budget impossible (format)."); }
+  // SRH paste: preview + import confirmé
+  const btnPreview = $("btnPreviewSrhPaste");
+  if (btnPreview){
+    btnPreview.addEventListener("click", ()=>{
+      const text = $("srhPaste")?.value || "";
+      if (!String(text).trim()){
+        alert("Aucune donnée collée.");
+        return;
+      }
+      const rows = parseSrhPasteToRows(text);
+      window.__srhPasteRows = rows;
+
+      const { totReal, totPrev } = computeSrhPreviewTotals(rows);
+      if ($("srhPrevCount")) $("srhPrevCount").textContent = `${rows.length}`;
+      if ($("srhPrevTotReal")) $("srhPrevTotReal").textContent = FR.fmtMoney(totReal);
+      if ($("srhPrevTotPrev")) $("srhPrevTotPrev").textContent = FR.fmtMoney(totPrev);
+      renderSrhPreview(rows);
+
+      // Alertes cohérence
+      const warns = buildSrhWarnings(rows);
+      const hint = $("srhPrevHint");
+      if (hint){
+        if (warns.length){
+          hint.innerHTML = `
+            <div class="alert alert-warning py-2 mb-0">
+              <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Points à vérifier</div>
+              <ul class="mb-0 ps-3">
+                ${warns.map(w=>`<li>${escapeHtml(w)}</li>`).join("")}
+              </ul>
+            </div>`;
+        } else {
+          hint.textContent = "Alerte cohérence : aucune anomalie évidente détectée.";
+        }
+      }
+
+      if (window.bootstrap?.Modal){
+        const m = bootstrap.Modal.getOrCreateInstance($("srhPreviewModal"));
+        m.show();
+      } else {
+        alert("Bootstrap JS manquant (modal).");
+      }
+    });
+  }
+
+  // B4.1.1 constants UI
+  const syncB411 = ()=>{
+    ensureB411Defaults();
+    if ($("b411NbJours")) state.b411.constants.nbJours = Number($("b411NbJours").value||0);
+    if ($("b411PctFonct")) state.b411.constants.pctFonctionnement = Number($("b411PctFonct").value||0);
+    if ($("b411PctRevers")) state.b411.constants.pctReversement = Number($("b411PctRevers").value||0);
+    computeB411();
+    saveLocalMaybe();
+  };
+  ["b411NbJours","b411PctFonct","b411PctRevers"].forEach(id=>{
+    const el = $(id);
+    if (el) el.addEventListener("change", syncB411);
+  });
+  const btnB411Recalc = $("btnB411Recalc");
+  if (btnB411Recalc) btnB411Recalc.addEventListener("click", syncB411);
+
+  // B4.1.1 lines UI bindings
+  const b411Domain = $("b411FilterDomain");
+  const b411Act = $("b411FilterActivity");
+  const b411Search = $("b411Search");
+  if (b411Domain) b411Domain.addEventListener("change", renderB411LinesTable);
+  if (b411Act) b411Act.addEventListener("change", renderB411LinesTable);
+  if (b411Search) b411Search.addEventListener("input", renderB411LinesTable);
+
+  const btnB411Clear = $("btnB411ClearFilters");
+  if (btnB411Clear){
+    btnB411Clear.addEventListener("click", ()=>{
+      if ($("b411FilterDomain")) $("b411FilterDomain").value = "";
+      if ($("b411FilterActivity")) $("b411FilterActivity").value = "";
+      if ($("b411Search")) $("b411Search").value = "";
+      renderB411LinesTable();
+    });
+  }
+
+  const btnB411Refresh = $("btnB411Refresh");
+  if (btnB411Refresh) btnB411Refresh.addEventListener("click", refreshB411LinesUI);
+
+  const btnB411ExportJson = $("btnB411ExportJson");
+  if (btnB411ExportJson){
+    btnB411ExportJson.addEventListener("click", ()=>{
+      ensureB411Defaults();
+      downloadJson("B4.1.1_lignes_generees.json", {
+        constants: state.b411.constants,
+        computed: state.b411.computed,
+        lines: state.b411.lines
+      });
+    });
+  }
+
+  const btnConfirm = $("btnConfirmImportSrh");
+  if (btnConfirm){
+    btnConfirm.addEventListener("click", ()=>{
+      const rows = window.__srhPasteRows || [];
+      if (!rows.length){
+        alert("Aucune ligne à importer (prévisualisez d’abord).");
+        return;
+      }
+      // NEW: alimente tableaux simplifiés + structure B4.1.1
+      buildB411FromSRHPaste(rows, { overwrite:true });
+      refreshB411LinesUI();
+
+      // Optionnel : conserver les transactions pour audit (si tu veux)
+      // applySrhPasteRows(rows);
+
+      window.__srhPasteRows = null;
+       if (window.bootstrap?.Modal){
+         const m = bootstrap.Modal.getInstance($("srhPreviewModal"));
+         if (m) m.hide();
+       }
+       alert(`Import SRH effectué : ${rows.length} lignes.`);
+     });
+  }
+
+  // Import direct (sans preview) : on force la preview si pas déjà faite
+  const btnImport = $("btnImportSrhPaste");
+  if (btnImport){
+    btnImport.addEventListener("click", ()=>{
+      const text = $("srhPaste")?.value || "";
+      if (!String(text).trim()){
+        alert("Aucune donnée collée.");
+        return;
+      }
+      // si pas de preview, on ouvre la preview (UX: import = preview + confirmation)
+      if (!window.__srhPasteRows){
+        $("btnPreviewSrhPaste")?.click();
+        return;
+      }
+      // si preview déjà faite, on propose d'importer via la modale (cohérent)
+      if (window.bootstrap?.Modal){
+        const m = bootstrap.Modal.getOrCreateInstance($("srhPreviewModal"));
+        m.show();
+      }
+    });
+  }
+
+  const btnClearSrhPaste = $("btnClearSrhPaste");
+  if (btnClearSrhPaste){
+    btnClearSrhPaste.addEventListener("click", ()=>{
+      if ($("srhPaste")) $("srhPaste").value = "";
+      window.__srhPasteRows = null;
     });
   }
 
   // mapping select changes persist
-  ["mapClcaDate","mapClcaAmount","mapClcaLabel","mapClcaStatus","mapClcaVendor",
-   "mapBudKey","mapBudLabel","mapBudReal","mapBudPrev","mapBudType"]
+  ["mapClcaDate","mapClcaAmount","mapClcaLabel","mapClcaStatus","mapClcaVendor"]
     .forEach(id=>{
       const el = $(id);
       if (!el) return;
