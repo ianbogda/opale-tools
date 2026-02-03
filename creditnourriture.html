@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SRH – Crédit nourriture (V2)</title>
+  <title>SRH – Crédit nourriture</title>
 
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -136,24 +136,26 @@
         <div>
           <div class="d-flex align-items-center gap-2">
             <span class="badge badge-soft rounded-pill"><i class="bi bi-clipboard-data me-1"></i> SRH – Pilotage</span>
+            <span class="badge text-bg-light border" id="lastImport">—</span>
           </div>
           <h1 class="h3 mb-1 mt-2">Crédit nourriture – Réel vs Prévisionnel</h1>
           <div class="text-muted">
-            Outil souple : import <span class="mono">CLCA</span> + restitution budgétaire SRH, règles de classement, tableau & graphique,
-            alerte dynamique et recommandation TR.
+            Import <span class="mono">CLCA</span> + restitution SRH, règles de classement, tableau & graphique, alerte dynamique et recommandation TR.
           </div>
         </div>
 
         <div class="d-flex flex-wrap gap-2">
-          <button class="btn btn-outline-primary" id="btnExport">
-            <i class="bi bi-download me-1"></i> Télécharger le suivi (JSON)
+          <button class="btn btn-outline-primary" id="btnExportJSON">
+            <i class="bi bi-download me-1"></i>Télécharger le suivi (JSON)
           </button>
+
           <label class="btn btn-outline-secondary mb-0">
-            <i class="bi bi-upload me-1"></i> Charger un suivi
+            <i class="bi bi-upload me-1"></i>Charger un suivi
             <input type="file" id="fileImportState" accept=".json" hidden>
           </label>
-          <button class="btn btn-primary" id="btnRecalc">
-            <i class="bi bi-calculator me-1"></i> Recalculer
+
+          <button class="btn btn-outline-danger" id="btnClearAll">
+            <i class="bi bi-trash3 me-1"></i>Réinitialiser
           </button>
         </div>
       </div>
@@ -162,20 +164,20 @@
 
   <main class="container my-4">
 
-    <!-- Alerts -->
-    <div id="alertBox"></div>
+    <!-- Alertes -->
+    <div id="alertBox" class="mb-3"></div>
 
-    <!-- KPI Row -->
+    <!-- KPIs -->
     <div class="row g-3 mb-3">
       <div class="col-12 col-lg-3">
         <div class="kpi">
-          <div class="small text-muted">Recettes réalisées</div>
+          <div class="small text-muted">Recettes à date</div>
           <div class="h4 mb-0" id="kpiRecReal">—</div>
         </div>
       </div>
       <div class="col-12 col-lg-3">
         <div class="kpi">
-          <div class="small text-muted">Dépenses réalisées</div>
+          <div class="small text-muted">Dépenses à date</div>
           <div class="h4 mb-0" id="kpiDepReal">—</div>
         </div>
       </div>
@@ -194,331 +196,22 @@
       </div>
     </div>
 
-    <!-- Top accordion (escamotable) -->
-    <div class="accordion mb-3" id="accTop">
-      <div class="accordion-item">
-        <h2 class="accordion-header" id="hTop">
-          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cTop" aria-expanded="true">
-            <i class="bi bi-sliders me-2"></i> Paramètres, périodes, imports OP@LE et règles (escamotable)
-          </button>
-        </h2>
-        <div id="cTop" class="accordion-collapse collapse show" data-bs-parent="#accTop">
-          <div class="accordion-body">
-            <div class="row g-3">
-
-              <!-- Période -->
-              <div class="col-12 col-lg-4">
-                <div class="card h-100">
-                  <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Période</div>
-                  <div class="card-body">
-                    <div class="mt-3">
-                      <div class="d-flex align-items-center justify-content-between gap-2">
-                        <div class="d-flex align-items-center justify-content-between gap-2">
-                          <label class="form-label mb-0">Vacances / interruptions</label>
-                        </div>
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Vacances">
-                          <button type="button" class="btn btn-outline-primary" id="btnAddBreak">
-                            <i class="bi bi-plus-circle me-1"></i>Ajouter
-                          </button>
-                          <button type="button" class="btn btn-outline-secondary" id="btnImportBreaks">
-                            <i class="bi bi-cloud-download me-1"></i>Importer
-                          </button>
-                        </div>
-                      </div>
-                      <div class="table-responsive mt-2">
-                        <table class="table table-sm align-middle mb-1">
-                          <thead>
-                            <tr>
-                              <th style="width:20%">Début</th>
-                              <th style="width:20%">Fin</th>
-                              <th style="width:12%"></th>
-                            </tr>
-                          </thead>
-                          <tbody id="breaksTableBody"></tbody>
-                        </table>
-                      </div>
-                      <div class="form-text">Les jours en vacances sont exclus des courbes et filtres période.</div>
-                      <!-- (optionnel) si tu veux encore importer/exporter en texte : garde un champ caché -->
-                      <textarea class="form-control d-none" id="periodBreaks"></textarea>
-
-                      <!-- Options import API (affiché au clic) -->
-                      <div class="border rounded-3 p-2 mt-2 d-none" id="breakImportBox">
-                        <div class="row g-2 align-items-end">
-                          <div class="col-12 col-lg-4">
-                            <label class="form-label small text-muted mb-1">Zone</label>
-                            <select class="form-select form-select-sm" id="breakZone">
-                              <option value="A">Zone A</option>
-                              <option value="B">Zone B</option>
-                              <option value="C">Zone C</option>
-                            </select>
-                          </div>
-                          <div class="col-12 col-lg-5">
-                            <label class="form-label small text-muted mb-1">Année scolaire</label>
-                            <select class="form-select form-select-sm" id="breakSchoolYear"></select>
-                          </div>
-                          <div class="col-12 col-lg-3 d-grid">
-                            <button type="button" class="btn btn-sm btn-primary" id="btnDoImportBreaks">
-                              <i class="bi bi-magic me-1"></i>Pré-remplir
-                            </button>
-                          </div>
-                        </div>
-
-                        <hr class="my-2">
-                        <div class="row g-2 align-items-end">
-                          <div class="col-12 col-lg-6 d-grid">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnDownloadIcs">
-                              <i class="bi bi-download me-1"></i>Télécharger .ics (Zone sélectionnée)
-                            </button>
-                          </div>
-                          <div class="col-12 col-lg-6">
-                            <label class="form-label small text-muted mb-1">Importer un fichier .ics téléchargé</label>
-                            <input type="file" class="form-control form-control-sm" id="icsFile" accept=".ics,text/calendar">
-                          </div>
-                        </div>
-
-                        <div class="form-text mt-2">
-                          Si l’import API est bloqué (CORS / file://), télécharge le .ics puis importe-le ici.
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Modal: ajout manuel d'une période -->
-                    <div class="modal fade" id="breakModal" tabindex="-1" aria-hidden="true">
-                      <div class="modal-dialog">
-                        <div class="modal-content">
-                          <div class="modal-header">
-                            <h5 class="modal-title"><i class="bi bi-calendar-plus me-2"></i>Ajouter une interruption</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                          </div>
-                          <div class="modal-body">
-                            <div class="mb-2">
-                              <label class="form-label">Libellé</label>
-                              <input type="text" class="form-control" id="breakLabel" placeholder="Ex. Toussaint / Noël / Fermeture exceptionnelle">
-                            </div>
-                            <div class="row g-2">
-                              <div class="col-6">
-                                <label class="form-label">Début</label>
-                                <input type="date" class="form-control" id="breakStart">
-                              </div>
-                              <div class="col-6">
-                                <label class="form-label">Fin</label>
-                                <input type="date" class="form-control" id="breakEnd">
-                              </div>
-                            </div>
-                            <div class="form-text mt-2">
-                              Une ligne sera ajoutée au format : <span class="mono">Libellé : YYYY-MM-DD → YYYY-MM-DD</span>
-                            </div>
-                          </div>
-                          <div class="modal-footer">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-                            <button type="button" class="btn btn-primary" id="btnSaveBreak">
-                              <i class="bi bi-check2 me-1"></i>Ajouter
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <hr class="my-3">
-                    <label class="form-label">Sensibilité alerte</label>
-                    <div class="row g-2">
-                      <div class="col-6">
-                        <label class="form-label small text-muted mb-1">Seuil base (% dépenses prév.)</label>
-                        <input type="number" class="form-control" id="baseThresholdPct" step="0.1" value="5.0">
-                      </div>
-                      <div class="col-6">
-                        <label class="form-label small text-muted mb-1">Facteur Sep–Déc</label>
-                        <input type="number" class="form-control" id="sepDecFactor" step="0.1" value="1.5">
-                      </div>
-                    </div>
-                    <div class="form-text">
-                      Alerte = mix valeur (X% des dépenses prévisionnelles) + sensibilité renforcée Sep–Déc.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Imports -->
-              <div class="col-12 col-lg-8">
-                <div class="card h-100">
-                  <div class="card-header"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Imports OP@LE (CLCA + Budget SRH)</div>
-                  <div class="card-body">
-                    <div class="row g-3">
-                      <div class="col-12 col-lg-6">
-                        <label class="form-label">Import CLCA (XLSX)</label>
-                        <input type="file" class="form-control" id="clcaFile" accept=".xlsx,.xls,.csv">
-                        <div class="form-text">Utilisé surtout pour les dépenses (engagé / consommé) + libellés/fournisseurs.</div>
-                      </div>
-
-                      <!-- SRH via collage + preview -->
-                      <div class="col-12">
-                        <div class="border rounded-3 p-3 bg-light">
-                          <div class="fw-semibold mb-2"><i class="bi bi-clipboard-plus me-2"></i>SRH (coller un tableau)</div>
-                          <textarea class="form-control mono" id="srhPaste" rows="8"
-                            placeholder="Copiez/collez ici la restitution SRH depuis Op@le (lignes SRH + comptes 6/7)."></textarea>
-                          <div class="d-flex flex-wrap gap-2 mt-2">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPreviewSrhPaste">
-                              <i class="bi bi-eye me-1"></i>Prévisualiser
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="btnImportSrhPaste">
-                              <i class="bi bi-cloud-arrow-down me-1"></i>Importer
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSrhPaste">
-                              <i class="bi bi-eraser me-1"></i>Vider
-                            </button>
-                          </div>
-                          <div class="form-text mt-2">
-                            Flux recommandé : <b>Prévisualiser</b> → vérifier → <b>Importer</b>.
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- Modal: SRH Preview -->
-                      <div class="modal fade" id="srhPreviewModal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title"><i class="bi bi-table me-2"></i>Prévisualisation SRH</h5>
-                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                            </div>
-                            <div class="modal-body">
-                              <div class="row g-2 mb-2">
-                                <div class="col-12 col-lg-4">
-                                  <div class="small text-muted">Lignes détectées</div>
-                                  <div class="h5 mb-0" id="srhPrevCount">—</div>
-                                </div>
-                                <div class="col-12 col-lg-4">
-                                  <div class="small text-muted">Total réalisé</div>
-                                  <div class="h5 mb-0" id="srhPrevTotReal">—</div>
-                                </div>
-                                <div class="col-12 col-lg-4">
-                                  <div class="small text-muted">Total prévision</div>
-                                  <div class="h5 mb-0" id="srhPrevTotPrev">—</div>
-                                </div>
-                              </div>
-
-                              <div class="table-responsive">
-                                <table class="table table-sm table-bordered align-middle mb-0">
-                                  <thead>
-                                    <tr>
-                                      <th>#</th>
-                                      <th>Compte</th>
-                                      <th>Type</th>
-                                      <th>Libellé</th>
-                                      <th class="text-end">Réalisé</th>
-                                      <th class="text-end">Prévision</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody id="srhPreviewBody">
-                                    <tr><td colspan="6" class="text-muted">Aucune donnée.</td></tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                              <div class="form-text mt-2" id="srhPrevHint">
-                                Aperçu limité aux 200 premières lignes (si plus).
-                              </div>
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-                              <button type="button" class="btn btn-primary" id="btnConfirmImportSrh">
-                                <i class="bi bi-check2-circle me-1"></i>Importer ces lignes
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="col-12">
-                        <div class="alert alert-light border mb-0">
-                          <div class="fw-semibold mb-1"><i class="bi bi-wrench-adjustable me-1"></i>Mapping des colonnes)</div>
-                          <div class="small text-muted">
-                            Après import, choisissez les colonnes utiles. L’outil retient vos choix dans le fichier de suivi.
-                          </div>
-                        </div>
-                      </div>
-
-                      <div class="col-12 col-lg-6">
-                        <div class="border rounded-3 p-3 bg-light">
-                          <div class="fw-semibold mb-2">Mapping CLCA</div>
-                          <div class="row g-2">
-                            <div class="col-6">
-                              <label class="form-label">Date</label>
-                              <select class="form-select" id="mapClcaDate"></select>
-                            </div>
-                            <div class="col-6">
-                              <label class="form-label">Montant</label>
-                              <select class="form-select" id="mapClcaAmount"></select>
-                            </div>
-                            <div class="col-6">
-                              <label class="form-label">Libellé / Objet</label>
-                              <select class="form-select" id="mapClcaLabel"></select>
-                            </div>
-                            <div class="col-6">
-                              <label class="form-label">Statut (engagé/payé)</label>
-                              <select class="form-select" id="mapClcaStatus"></select>
-                            </div>
-                            <div class="col-12">
-                              <label class="form-label">Fournisseur/Tiers (option)</label>
-                              <select class="form-select" id="mapClcaVendor"></select>
-                            </div>
-                          </div>
-                          <div class="form-text mt-2">
-                            Si “statut” est vide : l’outil classe en “réalisé” par défaut.
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Règles -->
-              <div class="col-12">
-                <div class="card">
-                  <div class="card-header"><i class="bi bi-funnel me-2"></i>Règles de classement (plastiques)</div>
-                  <div class="card-body">
-                    <div class="row g-3">
-                      <div class="col-12 col-lg-6">
-                        <label class="form-label">Règles RECETTES (mots-clés)</label>
-                        <textarea class="form-control" id="rulesRevenue" rows="3"
-                          placeholder="tickets, interne, commensaux, extérieur, location, hébergement, réception, annexe"></textarea>
-                        <div class="form-text">Séparez par virgule / point-virgule / retour ligne.</div>
-                      </div>
-                      <div class="col-12 col-lg-6">
-                        <label class="form-label">Règles DÉPENSES obligatoires & VIAB (mots-clés)</label>
-                        <textarea class="form-control" id="rulesSpend" rows="3"
-                          placeholder="eau, gaz, électricité, chauffage urbain, contrôle sanitaire, maintenance, révision, vérification, sécurité"></textarea>
-                        <div class="form-text">L’outil tentera VIAB via mots-clés eau/gaz/électricité/chauffage urbain.</div>
-                      </div>
-                      <div class="col-12">
-                        <div class="d-flex flex-wrap gap-2">
-                          <button class="btn btn-outline-secondary" id="btnClearImports">
-                            <i class="bi bi-eraser me-1"></i> Effacer imports
-                          </button>
-                          <button class="btn btn-outline-primary" id="btnSaveLocal">
-                            <i class="bi bi-floppy me-1"></i> Enregistrer en local (navigateur)
-                          </button>
-                          <button class="btn btn-outline-secondary" id="btnLoadLocal">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Recharger depuis local
-                          </button>
-                        </div>
-                        <div class="form-text mt-2">
-                          “Local” = stockage navigateur (pratique au quotidien). “Télécharger le suivi” = fichier portable (JSON).
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-            </div><!-- row -->
-          </div>
+    <!-- Graph (AVANT réglages) -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div><i class="bi bi-graph-up me-2"></i>Graphique – Réel vs Prévisionnel</div>
+        <span class="badge text-bg-light border">cumul période</span>
+      </div>
+      <div class="card-body">
+        <canvas id="cnChart" height="90"></canvas>
+        <div class="form-text mt-2">
+          Courbe = crédit nourriture cumulé sur la période (jours hors vacances). Barres = projection fin de période.
         </div>
       </div>
     </div>
 
-    <!-- Tables: Rubriques -->
-    <div class="row g-3 mb-3">
+    <!-- Rubriques (pilotage) -->
+    <div class="row g-3 mb-4">
       <div class="col-12 col-lg-6">
         <div class="card h-100">
           <div class="card-header"><i class="bi bi-cash-coin me-2"></i>Recettes (réalisé / prévision)</div>
@@ -544,14 +237,16 @@
                 </tfoot>
               </table>
             </div>
-            <div class="form-text mt-2">Vous pouvez saisir manuellement une ligne : double-cliquez une cellule Réalisé/Prévision.</div>
+            <div class="form-text mt-2">
+              Le “prévisionnel” SRH provient de l’import budget SRH ; le “réalisé” est consolidé via CLCA (si importé).
+            </div>
           </div>
         </div>
       </div>
 
       <div class="col-12 col-lg-6">
         <div class="card h-100">
-          <div class="card-header"><i class="bi bi-receipt-cutoff me-2"></i>Dépenses (VIAB + obligatoires + option denrées)</div>
+          <div class="card-header"><i class="bi bi-receipt me-2"></i>Dépenses (réalisé / prévision)</div>
           <div class="card-body">
             <div class="table-responsive">
               <table class="table table-sm table-bordered align-middle mb-0" id="tblDepenses">
@@ -581,44 +276,305 @@
         </div>
       </div>
     </div>
-    <!-- NEW: Constantes B4.1.1 (vote budget) -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-journal-text me-2"></i>Constantes B4.1.1 (préparation vote budget)</div>
+
+    <!-- Réglages & Imports (isolé, simple, escamotable) -->
+    <div class="accordion mb-4" id="accTop">
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hTop">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cTop" aria-expanded="false">
+            <i class="bi bi-sliders me-2"></i>Réglages & Imports (fermetures, CLCA, SRH, règles)
+          </button>
+        </h2>
+
+        <div id="cTop" class="accordion-collapse collapse" data-bs-parent="#accTop">
+          <div class="accordion-body">
+            <div class="row g-3">
+
+              <!-- Fermetures -->
+              <div class="col-12 col-lg-4">
+                <div class="card h-100">
+                  <div class="card-header d-flex align-items-center justify-content-between">
+                    <div><i class="bi bi-calendar3 me-2"></i>Fermetures & période</div>
+                    <button class="btn btn-sm btn-outline-primary" id="btnAddBreak">
+                      <i class="bi bi-plus-circle me-1"></i>Ajouter
+                    </button>
+                  </div>
+                  <div class="card-body">
+                    <div class="row g-2">
+                      <div class="col-6">
+                        <label class="form-label">Début période</label>
+                        <input type="date" class="form-control" id="periodStart">
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label">Fin période</label>
+                        <input type="date" class="form-control" id="periodEnd">
+                      </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between mt-3">
+                      <div class="fw-semibold">Vacances / interruptions</div>
+                      <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary" id="btnImportBreaks">
+                          <i class="bi bi-cloud-download me-1"></i>Importer
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnDownloadIcs">
+                          <i class="bi bi-calendar-event me-1"></i>ICS
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="table-responsive mt-2">
+                      <table class="table table-sm align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>Libellé</th>
+                            <th style="width: 120px;">Début</th>
+                            <th style="width: 120px;">Fin</th>
+                            <th class="text-end" style="width: 84px;">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody id="breaksTableBody">
+                          <tr><td colspan="4" class="text-muted">Aucune fermeture.</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <!-- stockage JSON (utilisé par JS) -->
+                    <textarea id="periodBreaks" class="d-none"></textarea>
+
+                    <hr class="my-3">
+                    <label class="form-label">Sensibilité alerte</label>
+                    <div class="row g-2">
+                      <div class="col-6">
+                        <label class="form-label small text-muted mb-1">Seuil base (% dépenses prév.)</label>
+                        <input type="number" class="form-control" id="baseThresholdPct" step="0.1" value="5.0">
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label small text-muted mb-1">Facteur Sep–Déc</label>
+                        <input type="number" class="form-control" id="sepDecFactor" step="0.1" value="1.5">
+                      </div>
+                    </div>
+                    <div class="form-text">
+                      Alerte = mix valeur (X% des dépenses prévisionnelles) + sensibilité renforcée Sep–Déc.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Imports -->
+              <div class="col-12 col-lg-8">
+                <div class="card h-100">
+                  <div class="card-header"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Imports OP@LE (CLCA + Budget SRH)</div>
+                  <div class="card-body">
+
+                    <div class="row g-3">
+                      <div class="col-12 col-lg-6">
+                        <label class="form-label">Import CLCA (XLSX)</label>
+                        <input type="file" class="form-control" id="clcaFile" accept=".xlsx,xls,csv">
+                        <div class="form-text">Utilisé surtout pour les dépenses (engagé / consommé) + libellés/fournisseurs.</div>
+                      </div>
+
+                      <div class="col-12 col-lg-6">
+                        <label class="form-label">Mapping colonnes CLCA</label>
+                        <div class="border rounded-3 p-3">
+                          <div class="row g-2">
+                            <div class="col-6">
+                              <label class="form-label small text-muted mb-1">Date</label>
+                              <select class="form-select" id="mapClcaDate"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label small text-muted mb-1">Montant</label>
+                              <select class="form-select" id="mapClcaAmount"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label small text-muted mb-1">Libellé / Objet</label>
+                              <select class="form-select" id="mapClcaLabel"></select>
+                            </div>
+                            <div class="col-6">
+                              <label class="form-label small text-muted mb-1">Statut (engagé/payé)</label>
+                              <select class="form-select" id="mapClcaStatus"></select>
+                            </div>
+                            <div class="col-12">
+                              <label class="form-label small text-muted mb-1">Fournisseur/Tiers (option)</label>
+                              <select class="form-select" id="mapClcaVendor"></select>
+                            </div>
+                          </div>
+                          <div class="form-text mt-2">
+                            Si “statut” est vide : l’outil classe en “réalisé” par défaut.
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- SRH collage -->
+                      <div class="col-12">
+                        <div class="border rounded-3 p-3 bg-light">
+                          <div class="fw-semibold mb-2"><i class="bi bi-clipboard-plus me-2"></i>Budget SRH (coller un tableau)</div>
+                          <textarea class="form-control mono" id="srhPaste" rows="8"
+                            placeholder="Copiez/collez ici la restitution SRH depuis Op@le (lignes SRH + comptes 6/7)."></textarea>
+                          <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPreviewSrhPaste">
+                              <i class="bi bi-eye me-1"></i>Prévisualiser
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="btnImportSrhPaste">
+                              <i class="bi bi-cloud-arrow-down me-1"></i>Importer
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSrhPaste">
+                              <i class="bi bi-eraser me-1"></i>Vider
+                            </button>
+                          </div>
+                          <div class="form-text mt-2" id="srhPrevHint">—</div>
+                        </div>
+                      </div>
+
+                      <div class="col-12 d-flex flex-wrap gap-2">
+                        <button class="btn btn-outline-primary" id="btnApplyImports">
+                          <i class="bi bi-check2-circle me-1"></i>Appliquer imports & recalculer
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <!-- Règles -->
+              <div class="col-12">
+                <div class="card">
+                  <div class="card-header"><i class="bi bi-funnel me-2"></i>Règles de classement</div>
+                  <div class="card-body">
+                    <div class="row g-3">
+                      <div class="col-12 col-lg-6">
+                        <label class="form-label">Règles RECETTES (mots-clés)</label>
+                        <textarea class="form-control" id="rulesRevenue" rows="3"
+                          placeholder="tickets, interne, commensaux, extérieur, location, hébergement, réception, annexe"></textarea>
+                        <div class="form-text">Séparez par virgule / point-virgule / retour ligne.</div>
+                      </div>
+                      <div class="col-12 col-lg-6">
+                        <label class="form-label">Règles DÉPENSES (mots-clés)</label>
+                        <textarea class="form-control" id="rulesSpend" rows="3"
+                          placeholder="denrées, viab, eau, gaz, électricité, entretien, hygiène, maintenance"></textarea>
+                        <div class="form-text">VIAB = eau, gaz, électricité, chauffage urbain…</div>
+                      </div>
+
+                      <!-- Zone import ICS -->
+                      <div class="col-12">
+                        <div class="border rounded-3 p-3">
+                          <div class="d-flex align-items-center justify-content-between">
+                            <div class="fw-semibold"><i class="bi bi-calendar2-week me-2"></i>Import vacances via ICS (option)</div>
+                            <label class="btn btn-sm btn-outline-secondary mb-0">
+                              <i class="bi bi-filetype-ics me-1"></i>Charger ICS
+                              <input type="file" id="icsFile" accept=".ics" hidden>
+                            </label>
+                          </div>
+                          <div class="row g-2 mt-2">
+                            <div class="col-12 col-lg-4">
+                              <label class="form-label small text-muted mb-1">Année scolaire</label>
+                              <input class="form-control" id="breakSchoolYear" placeholder="2025-2026">
+                            </div>
+                            <div class="col-12 col-lg-4">
+                              <label class="form-label small text-muted mb-1">Zone</label>
+                              <select class="form-select" id="breakZone">
+                                <option value="">—</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                              </select>
+                            </div>
+                            <div class="col-12 col-lg-4 d-grid">
+                              <label class="form-label small text-muted mb-1">&nbsp;</label>
+                              <button class="btn btn-outline-secondary" id="btnDoImportBreaks">
+                                <i class="bi bi-cloud-download me-1"></i>Importer
+                              </button>
+                            </div>
+                          </div>
+                          <div class="form-text mt-2" id="breakImportBox">—</div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- /row -->
+          </div><!-- /accordion-body -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Transactions (isolé) -->
+    <div class="card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div><i class="bi bi-list-check me-2"></i>Lignes importées (CLCA + Budget) – aperçu & correction</div>
+        <span class="badge text-bg-light border" id="txCount">0 ligne</span>
+      </div>
       <div class="card-body">
-        <div class="row g-3">
-          <div class="col-12 col-lg-3">
-            <label class="form-label">Nb jours</label>
-            <input type="number" class="form-control" id="b411NbJours" min="0" step="1">
-            <div class="form-text">Utilisé pour les calculs unitaires (si activés ensuite).</div>
+        <div class="row g-2 mb-2">
+          <div class="col-12 col-lg-4">
+            <input class="form-control" id="txSearch" placeholder="Filtrer (libellé / fournisseur / rubrique)…">
           </div>
           <div class="col-12 col-lg-3">
-            <label class="form-label">% Fonctionnement</label>
-            <input type="number" class="form-control" id="b411PctFonct" min="0" max="100" step="0.1">
-            <div class="form-text">Ex: 25 = 25% des recettes affectées.</div>
+            <select class="form-select" id="txFilterType">
+              <option value="">Tous types</option>
+              <option value="RECETTE">Recettes</option>
+              <option value="DEPENSE">Dépenses</option>
+            </select>
           </div>
           <div class="col-12 col-lg-3">
-            <label class="form-label">% Reversement CT</label>
-            <input type="number" class="form-control" id="b411PctRevers" min="0" max="100" step="0.1">
-            <div class="form-text">Ex: 25 = 25% des recettes affectées.</div>
+            <select class="form-select" id="txFilterScope">
+              <option value="PERIOD" selected>Dans la période</option>
+              <option value="ALL">Tout (sans filtre dates)</option>
+            </select>
           </div>
-          <div class="col-12 col-lg-3 d-grid">
-            <label class="form-label">&nbsp;</label>
-            <button class="btn btn-outline-primary" id="btnB411Recalc">
-              <i class="bi bi-calculator me-1"></i>Recalculer B4.1.1
+          <div class="col-12 col-lg-2 d-grid">
+            <button class="btn btn-outline-secondary" id="btnReclass">
+              <i class="bi bi-magic me-1"></i>Reclasser
             </button>
           </div>
+        </div>
 
-          <div class="col-12">
-            <div class="alert alert-light border mb-0">
-              <div class="fw-semibold mb-1"><i class="bi bi-info-circle me-1"></i>Principe</div>
-              <div class="small text-muted">
-                L’import SRH (collage) alimente automatiquement :
-                <span class="mono">1) vos tableaux simplifiés</span> (pilotage) et <span class="mono">2) une structure B4.1.1</span> (vote).
-              </div>
-            </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0" id="tblTx">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Rubrique</th>
+                <th>Libellé</th>
+                <th>Fournisseur</th>
+                <th class="text-end">Montant</th>
+                <th class="text-end">Statut</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="form-text mt-2">
+          Ici : correction rapide (rubrique/type) avant recalcul et génération B4.1.1.
+        </div>
+      </div>
+    </div>
+
+    <!-- Vote budget (isolé) -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div><i class="bi bi-journal-check me-2"></i>Vote budget – SRH / B4.1.1</div>
+        <button class="btn btn-outline-primary" id="btnB411Recalc">
+          <i class="bi bi-calculator me-1"></i>Recalculer B4.1.1
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-light border mb-0">
+          <div class="fw-semibold mb-1"><i class="bi bi-info-circle me-1"></i>Principe</div>
+          <div class="small text-muted">
+            L’import SRH alimente : <span class="mono">1) pilotage</span> (tableaux + graphique) et <span class="mono">2) structure B4.1.1</span> (préparation vote).
           </div>
+        </div>
 
-          <!-- mini synthèse B4.1.1 -->
+        <div class="row g-3 mt-2">
           <div class="col-12 col-lg-4">
             <div class="kpi">
               <div class="small text-muted">B4.1.1 – Total recettes (prévision)</div>
@@ -641,7 +597,152 @@
       </div>
     </div>
 
-    <!-- NEW: B4.1.1 - lignes générées (validation avant export) -->
+    <!-- Constantes SRH (année) -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div><i class="bi bi-gear-wide-connected me-2"></i>Constantes SRH – Référentiel (année)</div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" id="btnSConstReset">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser année
+          </button>
+          <button class="btn btn-sm btn-outline-primary" id="btnSConstApplyB411">
+            <i class="bi bi-upload me-1"></i>Appliquer à B4.1.1
+          </button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12 col-lg-3">
+            <label class="form-label">Année d’application</label>
+            <select class="form-select" id="srhConstYear"></select>
+            <div class="form-text">Permet de suivre l’évolution des paramètres d’une année sur l’autre.</div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <label class="form-label">Nb jours (référence)</label>
+            <input type="number" class="form-control" id="srhConstNbJours" min="0" step="1">
+            <div class="form-text">Valeur “année” (par défaut), chaque ligne peut surcharger.</div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <label class="form-label">% Fonctionnement (référence)</label>
+            <input type="number" class="form-control" id="srhConstPctFonct" min="0" max="100" step="0.1">
+          </div>
+          <div class="col-12 col-lg-3">
+            <label class="form-label">% Reversement CT (référence)</label>
+            <input type="number" class="form-control" id="srhConstPctRevers" min="0" max="100" step="0.1">
+          </div>
+        </div>
+
+        <hr class="my-3">
+
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="fw-semibold"><i class="bi bi-cash-coin me-2"></i>Recettes – cadre de base (paramètres + imputation + charges)</div>
+          <button class="btn btn-sm btn-outline-primary" id="btnSConstAddRec">
+            <i class="bi bi-plus-circle me-1"></i>Ajouter une ligne
+          </button>
+        </div>
+
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-bordered align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:120px;">Type</th>
+                <th style="width:190px;">Sous-type</th>
+                <th style="width:90px;">Domaine</th>
+                <th style="width:110px;">Activité</th>
+                <th style="width:110px;">Compte</th>
+                <th style="width:90px;" class="text-end">Nb jours</th>
+                <th style="width:110px;" class="text-end">% CT</th>
+                <th style="width:130px;" class="text-end">% Fonctionnement</th>
+                <th style="width:70px;"></th>
+              </tr>
+            </thead>
+            <tbody id="srhConstRecBody">
+              <tr><td colspan="9" class="text-muted">Aucune ligne.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="form-text mt-2">
+          Types attendus : <span class="mono">ELEVE</span>, <span class="mono">CONVIVE</span>, <span class="mono">EXTERNE</span>, <span class="mono">AUTRE</span>.
+        </div>
+
+        <hr class="my-3">
+
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="fw-semibold"><i class="bi bi-bag-plus me-2"></i>Autres recettes (produits annexes, dégradations, divers)</div>
+          <button class="btn btn-sm btn-outline-primary" id="btnSConstAddOtherRec">
+            <i class="bi bi-plus-circle me-1"></i>Ajouter une ligne
+          </button>
+        </div>
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-bordered align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:220px;">Libellé</th>
+                <th style="width:90px;">Domaine</th>
+                <th style="width:110px;">Activité</th>
+                <th style="width:110px;">Compte</th>
+                <th style="width:70px;"></th>
+              </tr>
+            </thead>
+            <tbody id="srhConstOtherRecBody">
+              <tr><td colspan="5" class="text-muted">Aucune ligne.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <hr class="my-3">
+
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="fw-semibold"><i class="bi bi-receipt me-2"></i>Dépenses – cadre de base (types + imputation)</div>
+          <button class="btn btn-sm btn-outline-primary" id="btnSConstAddSpend">
+            <i class="bi bi-plus-circle me-1"></i>Ajouter une ligne
+          </button>
+        </div>
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-bordered align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:120px;">Type</th>
+                <th style="width:90px;">Domaine</th>
+                <th style="width:130px;">Activité</th>
+                <th>Commentaire</th>
+                <th style="width:70px;"></th>
+              </tr>
+            </thead>
+            <tbody id="srhConstSpendBody">
+              <tr><td colspan="5" class="text-muted">Aucun type.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Constantes B4.1.1 (préparation vote budget) -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div><i class="bi bi-sliders me-2"></i>Constantes B4.1.1 (préparation vote budget)</div>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12 col-lg-4">
+            <label class="form-label">Nb jours (référence)</label>
+            <input type="number" class="form-control" id="b411NbJours" min="0" step="1">
+          </div>
+          <div class="col-12 col-lg-4">
+            <label class="form-label">% Fonctionnement</label>
+            <input type="number" class="form-control" id="b411PctFonct" min="0" max="100" step="0.1">
+          </div>
+          <div class="col-12 col-lg-4">
+            <label class="form-label">% Reversement CT</label>
+            <input type="number" class="form-control" id="b411PctRevers" min="0" max="100" step="0.1">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B4.1.1 – lignes générées -->
     <div class="card mb-3">
       <div class="card-header d-flex align-items-center justify-content-between">
         <div><i class="bi bi-table me-2"></i>B4.1.1 – lignes générées</div>
@@ -654,6 +755,7 @@
           </button>
         </div>
       </div>
+
       <div class="card-body">
         <div class="row g-2 align-items-end">
           <div class="col-12 col-lg-3">
@@ -686,11 +788,11 @@
             <div class="h5 mb-0" id="b411LinesCount">—</div>
           </div>
           <div class="col-12 col-lg-4">
-            <div class="small text-muted">Total Réalisé (filtre)</div>
+            <div class="small text-muted">Total réalisé</div>
             <div class="h5 mb-0" id="b411LinesTotReal">—</div>
           </div>
           <div class="col-12 col-lg-4">
-            <div class="small text-muted">Total Prévision (filtre)</div>
+            <div class="small text-muted">Total prévision</div>
             <div class="h5 mb-0" id="b411LinesTotPrev">—</div>
           </div>
         </div>
@@ -709,12 +811,11 @@
               </tr>
             </thead>
             <tbody id="b411LinesBody">
-              <tr><td colspan="6" class="text-muted">Aucune donnée B4.1.1. Importez un collage SRH.</td></tr>
+              <tr><td colspan="7" class="text-muted">Aucune donnée B4.1.1. Importez un collage SRH.</td></tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Contrôle sous-totaux "." / "-" -->
         <div class="mt-3">
           <div class="d-flex align-items-center justify-content-between">
             <div class="fw-semibold"><i class="bi bi-shield-check me-2"></i>Contrôle : Somme des comptes vs sous-totaux ( . / - )</div>
@@ -751,94 +852,97 @@
       </div>
     </div>
 
-    <!-- Graph -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-graph-up me-2"></i>Graphique – Réel vs Prévisionnel</div>
-      <div class="card-body">
-        <canvas id="chartCN" height="90"></canvas>
-        <div class="form-text mt-2">
-          Courbe = crédit nourriture cumulé sur la période (jours hors vacances). Barres = projection fin de période.
+  </main>
+
+  <!-- Modale : ajout/édition fermeture -->
+  <div class="modal fade" id="breakModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-calendar3 me-2"></i>Fermeture / interruption</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label">Libellé</label>
+              <input class="form-control" id="breakLabel" placeholder="Vacances / Pont / Fermeture technique…">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Début</label>
+              <input type="date" class="form-control" id="breakStart">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Fin</label>
+              <input type="date" class="form-control" id="breakEnd">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button class="btn btn-primary" id="btnSaveBreak"><i class="bi bi-check2 me-1"></i>Enregistrer</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Transactions -->
-    <div class="card mb-4">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <div><i class="bi bi-list-check me-2"></i>Lignes importées (CLCA + Budget) – aperçu & correction</div>
-        <span class="badge text-bg-light border" id="txCount">0 ligne</span>
-      </div>
-      <div class="card-body">
-        <div class="row g-2 mb-2">
-          <div class="col-12 col-lg-4">
-            <input class="form-control" id="txSearch" placeholder="Filtrer (libellé / fournisseur / rubrique)…">
+  <!-- Modale : preview SRH -->
+  <div class="modal fade" id="srhPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-eye me-2"></i>Prévisualisation import SRH</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2 mb-2">
+            <div class="col-12 col-lg-3">
+              <div class="small text-muted">Lignes</div>
+              <div class="h5 mb-0" id="srhPrevCount">—</div>
+            </div>
+            <div class="col-12 col-lg-3">
+              <div class="small text-muted">Total réalisé</div>
+              <div class="h5 mb-0" id="srhPrevTotReal">—</div>
+            </div>
+            <div class="col-12 col-lg-3">
+              <div class="small text-muted">Total prévision</div>
+              <div class="h5 mb-0" id="srhPrevTotPrev">—</div>
+            </div>
           </div>
-          <div class="col-12 col-lg-3">
-            <select class="form-select" id="txFilterType">
-              <option value="">Tous types</option>
-              <option value="RECETTE">Recettes</option>
-              <option value="DEPENSE">Dépenses</option>
-            </select>
-          </div>
-          <div class="col-12 col-lg-3">
-            <select class="form-select" id="txFilterScope">
-              <option value="PERIOD" selected>Dans la période</option>
-              <option value="ALL">Tout (sans filtre dates)</option>
-            </select>
-          </div>
-          <div class="col-12 col-lg-2 d-grid">
-            <button class="btn btn-outline-secondary" id="btnReclass">
-              <i class="bi bi-magic me-1"></i> Reclasser
-            </button>
+
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Domaine</th>
+                  <th>Activité</th>
+                  <th>Type</th>
+                  <th>Compte</th>
+                  <th>Libellé</th>
+                  <th class="text-end">Réalisé</th>
+                  <th class="text-end">Prévision</th>
+                </tr>
+              </thead>
+              <tbody id="srhPreviewBody"></tbody>
+            </table>
           </div>
         </div>
-
-        <div class="table-responsive">
-          <table class="table table-sm table-hover align-middle mb-0">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Rubrique</th>
-                <th>Libellé</th>
-                <th>Fournisseur</th>
-                <th class="text-end">Montant</th>
-                <th>Statut</th>
-                <th>Source</th>
-              </tr>
-            </thead>
-            <tbody id="txBody">
-              <tr><td colspan="9" class="text-muted">Aucune donnée importée.</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="form-text mt-2">
-          Correction rapide : cliquez sur “Rubrique” d’une ligne pour la modifier.
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+          <button class="btn btn-primary" id="btnConfirmImportSrh">
+            <i class="bi bi-cloud-arrow-down me-1"></i>Confirmer l’import
+          </button>
         </div>
       </div>
     </div>
-
-    <div class="sticky-actions py-3">
-      <div class="container d-flex flex-wrap gap-2 justify-content-end">
-        <button class="btn btn-outline-secondary" id="btnReset">
-          <i class="bi bi-trash3 me-1"></i> Réinitialiser
-        </button>
-        <button class="btn btn-outline-primary" id="btnExportCsv">
-          <i class="bi bi-filetype-csv me-1"></i> Export CSV (lignes)
-        </button>
-        <button class="btn btn-primary" id="btnRecalc2">
-          <i class="bi bi-check2-circle me-1"></i> Calculer
-        </button>
-      </div>
-    </div>
-
+  </div>
     <footer class="py-4">
       <div class="text-center small text-muted">
         <small id="app-version"></small>
       </div>
     </footer>
-  </main>
+</body>
+
 <script>
 /**
  * SRH Op@le - Crédit nourriture
@@ -1716,6 +1820,13 @@ const state = {
     clca: { date:"", amount:"", label:"", status:"", vendor:"" },
     budget: { key:"", label:"", real:"", prev:"", type:"" }
   },
+   // NEW: référentiel paramétrable (vote SRH / B4.1.1) + historique par année
+   srhConst: {
+     year: "", // AAAA
+     byYear: {
+       // "2025": { globals:{nbJours,pctFonct,pctRevers}, recettes:[...], autresRecettes:[...], depensesFamilles:[...] }
+     }
+   },
   categories: {
     recettes: [
       { id:"REC_TICKETS",   name:"Tickets", note:"" },
@@ -2774,11 +2885,284 @@ function loadLocalMaybe(){
     const obj = JSON.parse(s);
     if (obj && obj.categories && obj.transactions){
       Object.assign(state, obj);
+       // compat: garantir srhConst
+       if (!state.srhConst) state.srhConst = { year:"", byYear:{} };
       return true;
     }
   }catch{}
   return false;
 }
+ 
+ /* ==============================
+   SRH Constantes (année) – init + helpers
+ ============================== */
+ function currentYear(){
+   return String((new Date()).getFullYear());
+ }
+ 
+ function ensureSrhConst(){
+   if (!state.srhConst) state.srhConst = { year:"", byYear:{} };
+   if (!state.srhConst.year) state.srhConst.year = currentYear();
+   if (!state.srhConst.byYear) state.srhConst.byYear = {};
+   if (!state.srhConst.byYear[state.srhConst.year]){
+     state.srhConst.byYear[state.srhConst.year] = buildDefaultSrhConstForYear(state.srhConst.year);
+   }
+ }
+ 
+ function buildDefaultSrhConstForYear(year){
+   // Base inspirée de ton tableau (extrait image) + familles dépenses SRH usuelles
+   const y = String(year);
+   return {
+     globals: { nbJours:126, pctFonct:23.0, pctRevers:23.0 },
+     recettes: [
+       // ELEVE – internes
+       { type:"ELEVE", sousType:"Interne T1", domaine:"SRH", activite:"0ELEVES", compte:"706210", nbJours:126, pctRevers:3.0,  pctFonct:3.0  },
+       { type:"ELEVE", sousType:"Interne T2", domaine:"SRH", activite:"0ELEVES", compte:"706210", nbJours:126, pctRevers:16.5, pctFonct:16.5 },
+       { type:"ELEVE", sousType:"Interne T3", domaine:"SRH", activite:"0ELEVES", compte:"706210", nbJours:126, pctRevers:23.0, pctFonct:23.0 },
+       { type:"ELEVE", sousType:"Interne T4", domaine:"SRH", activite:"0ELEVES", compte:"706210", nbJours:126, pctRevers:31.0, pctFonct:31.0 },
+       { type:"ELEVE", sousType:"Interne CFA", domaine:"SRH", activite:"0NUITCFA", compte:"15000",  nbJours:126, pctRevers:23.0, pctFonct:23.0 },
+       // EXTERNE – tickets
+       { type:"EXTERNE", sousType:"Tickets T1", domaine:"SRH", activite:"0ELEVES", compte:"706210", nbJours:1,   pctRevers:0.0,  pctFonct:0.0  },
+       { type:"EXTERNE", sousType:"Tickets T2", domaine:"SRH", activite:"0ELEVES", compte:"706210", nbJours:1,   pctRevers:15.0, pctFonct:15.0 },
+       { type:"EXTERNE", sousType:"Tickets T3", domaine:"SRH", activite:"0ELEVES", compte:"706210", nbJours:1,   pctRevers:23.0, pctFonct:23.0 },
+       { type:"EXTERNE", sousType:"Tickets T4", domaine:"SRH", activite:"0ELEVES", compte:"706210", nbJours:1,   pctRevers:32.0, pctFonct:32.0 },
+       { type:"EXTERNE", sousType:"Tickets CFA",domaine:"SRH", activite:"0REPASCFA",compte:"706220", nbJours:1,   pctRevers:23.0, pctFonct:23.0 },
+       // AUTRE – snacking
+       { type:"AUTRE",   sousType:"Snacking",   domaine:"SRH", activite:"0SNACK",  compte:"706220", nbJours:1,   pctRevers:23.0, pctFonct:23.0 },
+       // CONVIVE – commensaux
+       { type:"CONVIVE", sousType:"Agents Région",domaine:"SRH",activite:"0COMM", compte:"706230", nbJours:1, pctRevers:23.0, pctFonct:23.0 },
+       { type:"CONVIVE", sousType:"Tarif C1",   domaine:"SRH", activite:"0COMM",  compte:"706230", nbJours:1, pctRevers:23.0, pctFonct:23.0 },
+       { type:"CONVIVE", sousType:"Tarif C2",   domaine:"SRH", activite:"0COMM",  compte:"706230", nbJours:1, pctRevers:23.0, pctFonct:23.0 },
+       { type:"CONVIVE", sousType:"Tarif C3",   domaine:"SRH", activite:"0COMM",  compte:"706230", nbJours:1, pctRevers:23.0, pctFonct:23.0 }
+     ],
+     autresRecettes: [
+       { libelle:"Dégradations", domaine:"SRH", activite:"0PRODANX", compte:"708800" }
+     ],
+     depensesFamilles: [
+       // Type (famille) + Sous-type (détail) + imputation
+       { type:"REVERS", sousType:"Reversement CT", domaine:"REVERS", activite:"0REVERSRH", commentaire:"Reversement collectivité" },
+       { type:"FONCT",  sousType:"Fournitures/achats", domaine:"FONCT",  activite:"0FOURNAUT", commentaire:"Fournitures / achats divers" },
+       { type:"FONCT",  sousType:"Entretien / prestations", domaine:"FONCT",  activite:"0ENTRLINGSRH", commentaire:"Entretien / prestations" },
+       { type:"FONCT",  sousType:"Charges générales", domaine:"FONCT",  activite:"0CHARGES", commentaire:"Charges générales" },
+       { type:"FONCT",  sousType:"Entretien matériel", domaine:"FONCT",  activite:"0ENTMAT", commentaire:"Entretien matériel" },
+       { type:"VIAB",   sousType:"Eau", domaine:"VIAB", activite:"0EAU",  commentaire:"Eau" },
+       { type:"VIAB",   sousType:"Gaz", domaine:"VIAB", activite:"0GAZ",  commentaire:"Gaz" },
+       { type:"VIAB",   sousType:"Électricité", domaine:"VIAB", activite:"0ELEC", commentaire:"Électricité" },
+       { type:"VIAB",   sousType:"Chauffage urbain", domaine:"VIAB", activite:"0URB", commentaire:"Chauffage urbain" }
+
+     ]
+   };
+ }
+ 
+ function getSrhConstYearObj(){
+   ensureSrhConst();
+   return state.srhConst.byYear[state.srhConst.year];
+ }
+ 
+ function fillYearSelect(){
+   const sel = $("srhConstYear");
+   if (!sel) return;
+   ensureSrhConst();
+   const y0 = Number(currentYear());
+   const years = [];
+   for (let k=-2; k<=3; k++) years.push(String(y0 + k));
+   sel.innerHTML = "";
+   for (const y of years){
+     const opt = document.createElement("option");
+     opt.value = y;
+     opt.textContent = y;
+     sel.appendChild(opt);
+   }
+   if (![...sel.options].some(o=>o.value===state.srhConst.year)) state.srhConst.year = years[years.length-1];
+   sel.value = state.srhConst.year;
+ }
+ 
+ function renderSrhConstUI(){
+   ensureSrhConst();
+   fillYearSelect();
+   const yObj = getSrhConstYearObj();
+   if ($("srhConstNbJours")) $("srhConstNbJours").value = Number(yObj.globals.nbJours||0);
+   if ($("srhConstPctFonct")) $("srhConstPctFonct").value = Number(yObj.globals.pctFonct||0);
+   if ($("srhConstPctRevers")) $("srhConstPctRevers").value = Number(yObj.globals.pctRevers||0);
+ 
+   renderSrhConstRecTable();
+   renderSrhConstOtherRecTable();
+   renderSrhConstSpendTable();
+ }
+ 
+ function tdInput(value, cls, type="text"){
+   const td = document.createElement("td");
+   const inp = document.createElement("input");
+   inp.type = type;
+   inp.className = cls || "form-control form-control-sm";
+   inp.value = value ?? "";
+   td.appendChild(inp);
+   return { td, inp };
+ }
+ 
+ function tdSelect(value, options){
+   const td = document.createElement("td");
+   const sel = document.createElement("select");
+   sel.className = "form-select form-select-sm";
+   for (const o of options){
+     const opt = document.createElement("option");
+     opt.value = o;
+     opt.textContent = o;
+     sel.appendChild(opt);
+   }
+   sel.value = value || options[0];
+   td.appendChild(sel);
+   return { td, sel };
+ }
+ 
+ function renderSrhConstRecTable(){
+   const body = $("srhConstRecBody");
+   if (!body) return;
+   const yObj = getSrhConstYearObj();
+   const rows = Array.isArray(yObj.recettes) ? yObj.recettes : [];
+   body.innerHTML = "";
+   if (!rows.length){
+     body.innerHTML = `<tr><td colspan="9" class="text-muted">Aucune ligne.</td></tr>`;
+     return;
+   }
+   rows.forEach((r, idx)=>{
+     const tr = document.createElement("tr");
+     const { td:tdType, sel:typeSel } = tdSelect(r.type, ["ELEVE","CONVIVE","EXTERNE","AUTRE"]);
+     const { td:tdSous, inp:sousInp } = tdInput(r.sousType, "form-control form-control-sm");
+     const { td:tdDom, inp:domInp } = tdInput(r.domaine || "SRH", "form-control form-control-sm mono");
+     const { td:tdAct, inp:actInp } = tdInput(r.activite, "form-control form-control-sm mono");
+     const { td:tdCpt, inp:cptInp } = tdInput(r.compte, "form-control form-control-sm mono");
+     const { td:tdJ,   inp:jInp   } = tdInput(r.nbJours, "form-control form-control-sm text-end", "number");
+     const { td:tdR,   inp:rInp   } = tdInput(r.pctRevers, "form-control form-control-sm text-end", "number");
+     const { td:tdF,   inp:fInp   } = tdInput(r.pctFonct,  "form-control form-control-sm text-end", "number");
+ 
+     const tdA = document.createElement("td");
+     tdA.className = "text-end";
+     const btn = document.createElement("button");
+     btn.className = "btn btn-sm btn-outline-secondary";
+     btn.innerHTML = `<i class="bi bi-trash"></i>`;
+     btn.onclick = ()=>{
+       yObj.recettes.splice(idx,1);
+       renderSrhConstUI();
+       saveLocalMaybe();
+     };
+     tdA.appendChild(btn);
+ 
+     const sync = ()=>{
+       r.type = typeSel.value;
+       r.sousType = sousInp.value;
+       r.domaine = domInp.value;
+       r.activite = actInp.value;
+       r.compte = cptInp.value;
+       r.nbJours = Number(jInp.value||0);
+       r.pctRevers = Number(rInp.value||0);
+       r.pctFonct = Number(fInp.value||0);
+       saveLocalMaybe();
+     };
+     [typeSel,sousInp,domInp,actInp,cptInp,jInp,rInp,fInp].forEach(el=> el.addEventListener("change", sync));
+ 
+     tr.append(tdType, tdSous, tdDom, tdAct, tdCpt, tdJ, tdR, tdF, tdA);
+     body.appendChild(tr);
+   });
+ }
+ 
+ function renderSrhConstOtherRecTable(){
+   const body = $("srhConstOtherRecBody");
+   if (!body) return;
+   const yObj = getSrhConstYearObj();
+   const rows = Array.isArray(yObj.autresRecettes) ? yObj.autresRecettes : [];
+   body.innerHTML = "";
+   if (!rows.length){
+     body.innerHTML = `<tr><td colspan="5" class="text-muted">Aucune ligne.</td></tr>`;
+     return;
+   }
+   rows.forEach((r, idx)=>{
+     const tr = document.createElement("tr");
+     const { td:tdLib, inp:libInp } = tdInput(r.libelle, "form-control form-control-sm");
+     const { td:tdDom, inp:domInp } = tdInput(r.domaine || "SRH", "form-control form-control-sm mono");
+     const { td:tdAct, inp:actInp } = tdInput(r.activite, "form-control form-control-sm mono");
+     const { td:tdCpt, inp:cptInp } = tdInput(r.compte, "form-control form-control-sm mono");
+     const tdA = document.createElement("td");
+     tdA.className = "text-end";
+     const btn = document.createElement("button");
+     btn.className = "btn btn-sm btn-outline-secondary";
+     btn.innerHTML = `<i class="bi bi-trash"></i>`;
+     btn.onclick = ()=>{
+       yObj.autresRecettes.splice(idx,1);
+       renderSrhConstUI();
+       saveLocalMaybe();
+     };
+     tdA.appendChild(btn);
+ 
+     const sync = ()=>{
+       r.libelle = libInp.value;
+       r.domaine = domInp.value;
+       r.activite = actInp.value;
+       r.compte = cptInp.value;
+       saveLocalMaybe();
+     };
+     [libInp,domInp,actInp,cptInp].forEach(el=> el.addEventListener("change", sync));
+     tr.append(tdLib, tdDom, tdAct, tdCpt, tdA);
+     body.appendChild(tr);
+   });
+ }
+ 
+ function renderSrhConstSpendTable(){
+   const body = $("srhConstSpendBody");
+   if (!body) return;
+   const yObj = getSrhConstYearObj();
+   const rows = Array.isArray(yObj.depensesFamilles) ? yObj.depensesFamilles : [];
+   body.innerHTML = "";
+   if (!rows.length){
+     body.innerHTML = `<tr><td colspan="6" class="text-muted">Aucune ligne.</td></tr>`;
+     return;
+   }
+   rows.forEach((r, idx)=>{
+     const tr = document.createElement("tr");
+     const { td:tdType, sel:typeSel } = tdSelect(r.type, ["VIAB","FONCT","REVERS","DENREE","AUTRE"]);
+     const { td:tdDom,  inp:domInp  } = tdInput(r.domaine, "form-control form-control-sm mono");
+     const { td:tdAct,  inp:actInp  } = tdInput(r.activite, "form-control form-control-sm mono");
+     const { td:tdCom,  inp:comInp  } = tdInput(r.commentaire, "form-control form-control-sm");
+     const tdA = document.createElement("td");
+     tdA.className = "text-end";
+     const btn = document.createElement("button");
+     btn.className = "btn btn-sm btn-outline-secondary";
+     btn.innerHTML = `<i class="bi bi-trash"></i>`;
+     btn.onclick = ()=>{
+       yObj.depensesFamilles.splice(idx,1);
+       renderSrhConstUI();
+       saveLocalMaybe();
+     };
+     tdA.appendChild(btn);
+ 
+     const sync = ()=>{
+       r.type = typeSel.value;
+       r.domaine = domInp.value;
+       r.activite = actInp.value;
+       r.commentaire = comInp.value;
+       saveLocalMaybe();
+     };
+     [typeSel,domInp,actInp,comInp].forEach(el=> el.addEventListener("change", sync));
+     tr.append(tdType, tdDom, tdAct, tdCom, tdA);
+     body.appendChild(tr);
+   });
+ }
+ 
+ function applySrhConstToB411(){
+   // Remplit les constantes “vote budget” à partir de l’année SRH sélectionnée
+   ensureB411Defaults();
+   const yObj = getSrhConstYearObj();
+   const g = yObj.globals || {};
+   state.b411.constants.nbJours = Number(g.nbJours||0);
+   state.b411.constants.pctFonctionnement = Number(g.pctFonct||0);
+   state.b411.constants.pctReversement = Number(g.pctRevers||0);
+   if ($("b411NbJours")) $("b411NbJours").value = state.b411.constants.nbJours;
+   if ($("b411PctFonct")) $("b411PctFonct").value = state.b411.constants.pctFonctionnement;
+   if ($("b411PctRevers")) $("b411PctRevers").value = state.b411.constants.pctReversement;
+   computeB411();
+   refreshB411LinesUI();
+   saveLocalMaybe();
+ }
 
 /* ==============================
   Export / Import JSON (fichier de suivi)
@@ -2835,6 +3219,67 @@ function applyPendingImports(){
 }
 
 function bindUI(){
+   // NEW: SRH Constantes UI
+   ensureSrhConst();
+   renderSrhConstUI();
+ 
+   const selY = $("srhConstYear");
+   if (selY){
+     selY.addEventListener("change", ()=>{
+       state.srhConst.year = selY.value;
+       ensureSrhConst();
+       renderSrhConstUI();
+       saveLocalMaybe();
+     });
+   }
+   const syncGlobals = ()=>{
+     const yObj = getSrhConstYearObj();
+     yObj.globals.nbJours = Number($("srhConstNbJours")?.value||0);
+     yObj.globals.pctFonct = Number($("srhConstPctFonct")?.value||0);
+     yObj.globals.pctRevers = Number($("srhConstPctRevers")?.value||0);
+     saveLocalMaybe();
+   };
+   ["srhConstNbJours","srhConstPctFonct","srhConstPctRevers"].forEach(id=>{
+     const el = $(id);
+     if (el) el.addEventListener("change", syncGlobals);
+   });
+ 
+   const btnAddRec = $("btnSConstAddRec");
+   if (btnAddRec){
+     btnAddRec.addEventListener("click", ()=>{
+       const yObj = getSrhConstYearObj();
+       yObj.recettes.push({ type:"ELEVE", sousType:"", domaine:"SRH", activite:"", compte:"", nbJours:Number(yObj.globals.nbJours||0), pctRevers:Number(yObj.globals.pctRevers||0), pctFonct:Number(yObj.globals.pctFonct||0) });
+       renderSrhConstUI(); saveLocalMaybe();
+     });
+   }
+   const btnAddOtherRec = $("btnSConstAddOtherRec");
+   if (btnAddOtherRec){
+     btnAddOtherRec.addEventListener("click", ()=>{
+       const yObj = getSrhConstYearObj();
+       yObj.autresRecettes.push({ libelle:"", domaine:"SRH", activite:"", compte:"" });
+       renderSrhConstUI(); saveLocalMaybe();
+     });
+   }
+   const btnAddSpend = $("btnSConstAddSpend");
+   if (btnAddSpend){
+     btnAddSpend.addEventListener("click", ()=>{
+       const yObj = getSrhConstYearObj();
+       yObj.depensesFamilles.push({ type:"FONCT", domaine:"FONCT", activite:"", commentaire:"" });
+       renderSrhConstUI(); saveLocalMaybe();
+     });
+   }
+   const btnResetYear = $("btnSConstReset");
+   if (btnResetYear){
+     btnResetYear.addEventListener("click", ()=>{
+       ensureSrhConst();
+       state.srhConst.byYear[state.srhConst.year] = buildDefaultSrhConstForYear(state.srhConst.year);
+       renderSrhConstUI();
+       saveLocalMaybe();
+     });
+   }
+   const btnApplyB411 = $("btnSConstApplyB411");
+   if (btnApplyB411) btnApplyB411.addEventListener("click", applySrhConstToB411);
+ 
   // re-calc on parameter changes
   ["periodStart","periodEnd","baseThresholdPct","sepDecFactor","rulesRevenue","rulesSpend"]
     .forEach(id=>{
