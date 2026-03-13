@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Décodage IBAN FR — Code banque / guichet / RIB / BIC</title>
+  <title>Décodage IBAN (25+ pays) — Analyse / BBAN / BIC / PDF / QR SEPA</title>
 
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -49,7 +49,7 @@
   <nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container py-2">
       <span class="brand-pill">
-        <h1>Décodage IBAN FR</h1>
+        <h1>Décodage IBAN (25+ pays)</h1>
       </span>
       <div class="ms-auto d-flex gap-2">
         <button class="btn btn-outline-primary" id="btnExample">Exemple</button>
@@ -67,7 +67,7 @@
           <div class="d-flex align-items-start justify-content-between gap-3">
             <div>
               <h1 class="h4 mb-1">Entrée</h1>
-              <p class="text-muted mb-0">Saisissez un IBAN. Ce module décode le format <span class="badge badge-soft">FR</span> et contrôle la validité (MOD 97).</p>
+              <p class="text-muted mb-0">Saisissez un IBAN. Le module contrôle la validité (MOD 97), extrait les composantes BBAN (25+ pays), tente un lookup banque/BIC, et génère un RIB PDF + QR SEPA.</p>
             </div>
           </div>
 
@@ -97,6 +97,13 @@
               <p class="text-muted mb-2">
                 Le BIC n’est pas codé dans l’IBAN. Le module fait un lookup à partir du <span class="mono">code banque</span> via ce JSON local.
               </p>
+
+              <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" value="" id="chkOnlineLookup" checked>
+                <label class="form-check-label" for="chkOnlineLookup">
+                  
+              </div>
+
               <textarea id="bankRef" class="form-control mono" rows="8" spellcheck="false"></textarea>
               <div class="d-flex gap-2 mt-2">
                 <button class="btn btn-outline-secondary" id="btnApplyRef">Appliquer</button>
@@ -145,7 +152,7 @@
               <button class="btn btn-outline-secondary" id="btnCopyAll">Copier tout</button>
             </div>
             <div class="small-note mt-2">
-              BBAN (FR) = code banque + code guichet + n° compte + clé RIB.
+              BBAN = composantes nationales (structure variable selon pays).
             </div>
           </div>
 
@@ -208,7 +215,7 @@
             </div>
           </div>
 
-          <!-- IBAN / BIC -->
+          <!-- IBAN / BIC-SWIFT -->
           <div class="mt-3" style="border:1px solid #bdbdbd;">
             <div class="d-grid" style="grid-template-columns: .35fr 1fr;">
               <div class="p-2 fw-bold" style="border-right:1px solid #bdbdbd;">IBAN</div>
@@ -216,9 +223,9 @@
                 <span class="mono" id="ribIbanPreview">—</span>
               </div>
 
-              <div class="p-2 fw-bold" style="border-top:1px solid #bdbdbd;border-right:1px solid #bdbdbd;">BIC</div>
+              <div class="p-2 fw-bold" style="border-top:1px solid #bdbdbd;border-right:1px solid #bdbdbd;">BIC/SWIFT</div>
               <div class="p-2" style="background:#f2f2f2;border-top:1px solid #bdbdbd;">
-                <span class="mono" id="ribBicPreview">—</span>
+                <input class="form-control form-control-sm mono border-0 bg-transparent p-0" id="ribBicPreview" value="" placeholder="BIC/SWIFT" readonly />
               </div>
             </div>
           </div>
@@ -231,6 +238,11 @@
             <div class="text-muted mt-2" style="font-style:italic;">(adresse postale de la banque généralement)</div>
             <textarea class="form-control mt-2" id="ribBankAddress" rows="2" placeholder="Adresse de la banque"></textarea>
           </div>
+        
+          
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -258,7 +270,7 @@
   /**
  * IBAN Op@le - IBAN vers RIB
  *
- * @version 0.1.3
+ * @version 0.2.0
  * @author Yann Bogdanovic
  * @description
  *  - IBAN OP@LE permet de vérifier un IBAN et de découper selon RIB
@@ -266,8 +278,10 @@
  *  v0.1.3
  *    - ajout codebanque.json pour une maj des données de référence en local
  *    - domiciliation de la banque non bloquante pour le génération du RIB en PDF
+ *  v0.2.0
+ *    - ajout traitement multi pays
  */
-	const APP_VERSION = "IBAN OP@LE - 0.1.3";
+	const APP_VERSION = "IBAN OP@LE - 0.2.0";
 	window.addEventListener("DOMContentLoaded", () => {
 		const el = document.getElementById("app-version");
 		if (el) el.textContent = APP_VERSION;
@@ -928,6 +942,34 @@ function getAnalyzerState(){
   return { bankCode, branchCode, account, ribKey, bankName, bic, ibanRaw, ibanPretty };
 }
 
+function isFrenchIban(ibanRaw){
+  return String(ibanRaw || "").slice(0, 2).toUpperCase() === "FR";
+}
+
+function getRibBicSwiftValue(){
+  return (document.getElementById("ribBicPreview")?.value || "").trim().toUpperCase();
+}
+
+function syncRibBicSwiftField(){
+  const s = getAnalyzerState();
+  const bicInput = document.getElementById("ribBicPreview");
+  if (!bicInput) return;
+
+  const isFr = isFrenchIban(s.ibanRaw);
+  const currentValue = bicInput.value.trim();
+  const lookupValue = (s.bic || "").trim();
+
+  if (!currentValue || currentValue === "—" || currentValue === "Inconnu (lookup)"){
+    bicInput.value = lookupValue && lookupValue !== "Inconnu (lookup)" ? lookupValue : "";
+  }
+
+  bicInput.readOnly = isFr;
+  bicInput.classList.toggle("bg-white", !isFr);
+  bicInput.classList.toggle("bg-transparent", isFr);
+  bicInput.placeholder = isFr ? "BIC/SWIFT" : "Saisir le SWIFT de la banque étrangère";
+  bicInput.title = isFr ? "Champ alimenté automatiquement pour un IBAN français" : "IBAN non français : vous pouvez saisir le code SWIFT";
+}
+
 // --- Remplir le preview modal depuis l’analyzer
 function fillRibModalFromAnalyzer(){
   const s = getAnalyzerState();
@@ -938,7 +980,7 @@ function fillRibModalFromAnalyzer(){
   document.getElementById("ribAccountPreview").textContent = s.account || "—";
   document.getElementById("ribKeyPreview").textContent = s.ribKey || "—";
   document.getElementById("ribIbanPreview").textContent = s.ibanPretty || "—";
-  document.getElementById("ribBicPreview").textContent = s.bic || "—";
+  syncRibBicSwiftField();
 
   // Domiciliation préremplie (modifiable)
   const bankNameInput = document.getElementById("ribBankName");
@@ -950,7 +992,9 @@ function fillRibModalFromAnalyzer(){
   }
 
   validateRibModal(); // met à jour bouton + message
-}
+
+  }
+
 
 // --- Validation des champs requis
 function getRibMissingFields(){
@@ -970,13 +1014,9 @@ function getRibMissingFields(){
   //if (!bankAddr)   missing.push("Adresse de la banque (domiciliation)");
 
   // Champs “décodés”
-  // On exige qu’ils existent réellement (donc que l’IBAN soit FR et décodé)
-  if (!s.bankCode || s.bankCode.includes("—")) missing.push("Code banque (depuis l’IBAN)");
-  if (!s.branchCode || s.branchCode.includes("—")) missing.push("Code guichet (depuis l’IBAN)");
-  if (!s.account || s.account.includes("—")) missing.push("Numéro de compte (depuis l’IBAN)");
-  if (!s.ribKey || s.ribKey.includes("—")) missing.push("Clé RIB (depuis l’IBAN)");
+  // Multi-pays : on demande au minimum un IBAN décodé + un identifiant national (BBAN) ; BIC non bloquant.
   if (!s.ibanRaw || s.ibanRaw.length < 15) missing.push("IBAN");
-  if (!s.bic || s.bic.includes("—") || s.bic.toLowerCase().includes("inconnu")) missing.push("BIC (référentiel)");
+  if ((!s.account || s.account.includes("—")) && (!s.bankCode || s.bankCode.includes("—"))) missing.push("Composantes nationales (BBAN)");
 
   return missing;
 }
@@ -1003,10 +1043,12 @@ async function generateRibPdfA5Landscape(){
   if (missing.length > 0) return; // sécurité
 
   const s = getAnalyzerState();
+  const country = (s.ibanRaw || '""').slice(0,2);
   const holderName = document.getElementById("ribHolderName").value.trim();
   const holderAddr = document.getElementById("ribHolderAddress").value.trim();
   const bankName   = document.getElementById("ribBankName").value.trim();
   const bankAddr   = document.getElementById("ribBankAddress").value.trim();
+  const bicSwift   = getRibBicSwiftValue();
 
   const { jsPDF } = window.jspdf;
 
@@ -1042,35 +1084,49 @@ async function generateRibPdfA5Landscape(){
   const holderAddrLines = doc.splitTextToSize(holderAddr, W - 2*margin - 12);
   doc.text(holderAddrLines, margin + 6, y);
 
-  // Tableau code banque / guichet / compte / clé
+  
+  // Tableau identification nationale (selon pays)
   y += (holderAddrLines.length * 4) + 8;
 
-  const tableX = margin + 6;
-  const tableW = W - 2*margin - 12;
+  const tableInset = margin + 6;
+  const tableX = tableInset;
+  const tableW = W - (2 * tableInset); // largeur symétrique : même marge à gauche et à droite
   const tableY = y;
   const headerH = 10;
   const rowH = 10;
 
-  const colWidths = [
-    tableW * 0.26, // code banque
-    tableW * 0.26, // code guichet
-    tableW * 0.34, // compte
-    tableW * 0.14  // clé
-  ];
+  // Définition colonnes selon pays
+  let headers = [];
+  let vals = [];
+  if (country === "FR"){
+    headers = ["Code banque", "Code Guichet", "Numéro de compte", "Clé FR"];
+    vals = [s.bankCode, s.branchCode, s.account, s.ribKey];
+  }else if (country === "ES"){
+    headers = ["Banque", "Guichet", "Clé ES", "Numéro de compte"];
+    vals = [s.bankCode, s.branchCode, s.ribKey, s.account];
+  }else if (country === "HR"){
+    headers = ["Code banque", "Numéro de compte"];
+    vals = [s.bankCode, s.account];
+  }else{
+    headers = ["BBAN"];
+    vals = [ (s.bankCode && s.bankCode !== "—") ? [s.bankCode, s.branchCode, s.ribKey, s.account].filter(v => v && v !== "—").join(" ") : (s.account || "—") ];
+  }
 
-  // Header row
+  const colCount = headers.length;
+  const colWidths = new Array(colCount).fill(tableW / colCount);
+
+  // Header
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.rect(tableX, tableY, tableW, headerH);
   let cx = tableX;
-  const headers = ["Code banque", "Code Guichet", "Numéro de compte", "Clé RIB"];
-  for (let i=0;i<4;i++){
+  for (let i=0;i<colCount;i++){
     doc.rect(cx, tableY, colWidths[i], headerH);
     doc.text(headers[i], cx + 2.5, tableY + 6.8);
     cx += colWidths[i];
   }
 
-  // Value row (gris)
+  // Values
   doc.setFillColor(242,242,242);
   doc.rect(tableX, tableY + headerH, tableW, rowH, "F");
   doc.setDrawColor(0);
@@ -1079,14 +1135,15 @@ async function generateRibPdfA5Landscape(){
   doc.setFont("courier", "normal");
   doc.setFontSize(12);
   cx = tableX;
-  const vals = [s.bankCode, s.branchCode, s.account, s.ribKey];
-  for (let i=0;i<4;i++){
+  for (let i=0;i<colCount;i++){
     doc.rect(cx, tableY + headerH, colWidths[i], rowH);
-    doc.text(vals[i], cx + 2.5, tableY + headerH + 6.8);
+    const v = String(vals[i] ?? "—");
+    doc.text(v, cx + 2.5, tableY + headerH + 6.8);
     cx += colWidths[i];
   }
 
-  // IBAN / BIC blocs
+  // IBAN / BIC
+
   y = tableY + headerH + rowH + 8;
   const ibX = tableX;
   const ibWLeft = tableW * 0.18;
@@ -1113,7 +1170,7 @@ async function generateRibPdfA5Landscape(){
   doc.setFontSize(12);
   doc.rect(ibX, y, tableW, rowH);
   doc.rect(ibX, y, ibWLeft, rowH);
-  doc.text("BIC", ibX + 2.5, y + 6.8);
+  doc.text("BIC/SWIFT", ibX + 2.5, y + 6.8);
 
   doc.setFillColor(242,242,242);
   doc.rect(ibX + ibWLeft, y, ibWRight, rowH, "F");
@@ -1121,7 +1178,7 @@ async function generateRibPdfA5Landscape(){
 
   doc.setFont("courier","normal");
   doc.setFontSize(11);
-  doc.text(s.bic, ibX + ibWLeft + 2.5, y + 6.8);
+  doc.text(bicSwift || "—", ibX + ibWLeft + 2.5, y + 6.8);
 
   // Domiciliation
   y += rowH + 10;
@@ -1150,7 +1207,7 @@ document.getElementById("btnOpenRibModal").addEventListener("click", () => {
 });
 
 // Validation live
-["ribHolderName","ribHolderAddress","ribBankName"].forEach(
+["ribHolderName","ribHolderAddress","ribBankName","ribBicPreview"].forEach(
   id => document.getElementById(id).addEventListener("input", validateRibModal)
 );
 
@@ -1158,7 +1215,7 @@ document.getElementById("btnOpenRibModal").addEventListener("click", () => {
 document.getElementById("btnGenerateRibPdf").addEventListener("click", async () => {
   validateRibModal();
   if (!document.getElementById("btnGenerateRibPdf").disabled){
-    await generateRibPdfA5Landscape();
+    generateRibPdfA5Landscape();
   }
 });
 
@@ -1196,133 +1253,284 @@ document.getElementById("btnGenerateRibPdf").addEventListener("click", async () 
       return navigator.clipboard.writeText(text);
     }
 
-    // ---------------------------
-    // Main decode (FR only)
-    // ---------------------------
-    function decode(){
-      hideMsg();
-      clearOutputs();
+    
+// ---------------------------
+// Multi-country IBAN module (25+ pays)
+// ---------------------------
 
-      const raw = $("iban").value;
-      const iban = normalizeIban(raw);
+// IBAN formats (length + component slicing on BBAN). Coverage >= 25.
+// Notes: slicing reflects common national structures; some countries' BBAN parts are not meaningfully decomposable without local rules.
+const IBAN_SPECS = {
+  // Core SEPA
+  "FR": { len:27, fields:[
+    {key:"bankCode",  label:"Code banque",  from:4,  to:9},
+    {key:"branchCode",label:"Code guichet", from:9,  to:14},
+    {key:"account",   label:"N° de compte", from:14, to:25},
+    {key:"ribKey",    label:"Clé nationale",from:25, to:27}
+  ]},
+  "ES": { len:24, fields:[
+    {key:"bankCode",  label:"Banque",       from:4,  to:8},
+    {key:"branchCode",label:"Guichet",      from:8,  to:12},
+    {key:"ribKey",    label:"Clé nationale",from:12, to:14},
+    {key:"account",   label:"N° de compte", from:14, to:24}
+  ]},
+  "HR": { len:21, fields:[
+    {key:"bankCode",  label:"Code banque",  from:4,  to:11},
+    {key:"account",   label:"N° de compte", from:11, to:21}
+  ]},
+  "DE": { len:22, fields:[{key:"bankCode",label:"Bankleitzahl",from:4,to:12},{key:"account",label:"Compte",from:12,to:22}]},
+  "NL": { len:18, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"account",label:"Compte",from:8,to:18}]},
+  "BE": { len:16, fields:[{key:"bankCode",label:"Banque",from:4,to:7},{key:"account",label:"Compte",from:7,to:16}]},
+  "LU": { len:20, fields:[{key:"bankCode",label:"Banque",from:4,to:7},{key:"account",label:"Compte",from:7,to:20}]},
+  "PT": { len:25, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"branchCode",label:"Guichet",from:8,to:12},{key:"account",label:"Compte",from:12,to:23},{key:"ribKey",label:"Clé nationale",from:23,to:25}]},
+  "IE": { len:22, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"branchCode",label:"Agence",from:8,to:14},{key:"account",label:"Compte",from:14,to:22}]},
+  "IT": { len:27, fields:[{key:"ribKey",label:"CIN",from:4,to:5},{key:"bankCode",label:"ABI",from:5,to:10},{key:"branchCode",label:"CAB",from:10,to:15},{key:"account",label:"Compte",from:15,to:27}]},
+  "AT": { len:20, fields:[{key:"bankCode",label:"Banque",from:4,to:9},{key:"account",label:"Compte",from:9,to:20}]},
+  "FI": { len:18, fields:[{key:"bankCode",label:"Banque",from:4,to:10},{key:"account",label:"Compte",from:10,to:18}]},
+  "GR": { len:27, fields:[{key:"bankCode",label:"Banque",from:4,to:7},{key:"branchCode",label:"Agence",from:7,to:11},{key:"account",label:"Compte",from:11,to:27}]},
+  "SI": { len:19, fields:[{key:"bankCode",label:"Banque",from:4,to:6},{key:"branchCode",label:"Agence",from:6,to:11},{key:"account",label:"Compte",from:11,to:19}]},
+  "SK": { len:24, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"account",label:"Compte",from:8,to:24}]},
+  "LT": { len:20, fields:[{key:"bankCode",label:"Banque",from:4,to:9},{key:"account",label:"Compte",from:9,to:20}]},
+  "LV": { len:21, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"account",label:"Compte",from:8,to:21}]},
+  "EE": { len:20, fields:[{key:"bankCode",label:"Banque",from:4,to:6},{key:"account",label:"Compte",from:6,to:20}]},
+  "MT": { len:31, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"branchCode",label:"Agence",from:8,to:13},{key:"account",label:"Compte",from:13,to:31}]},
+  "CY": { len:28, fields:[{key:"bankCode",label:"Banque",from:4,to:7},{key:"branchCode",label:"Agence",from:7,to:12},{key:"account",label:"Compte",from:12,to:28}]},
+  "PL": { len:28, fields:[{key:"bankCode",label:"Banque",from:4,to:12},{key:"account",label:"Compte",from:12,to:28}]},
+  "CZ": { len:24, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"account",label:"Compte",from:8,to:24}]},
+  "HU": { len:28, fields:[{key:"bankCode",label:"Banque",from:4,to:11},{key:"branchCode",label:"Agence",from:11,to:15},{key:"account",label:"Compte",from:15,to:28}]},
+  "RO": { len:24, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"account",label:"Compte",from:8,to:24}]},
+  "BG": { len:22, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"branchCode",label:"Agence",from:8,to:12},{key:"account",label:"Compte",from:12,to:22}]},
+  "DK": { len:18, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"account",label:"Compte",from:8,to:18}]},
+  "SE": { len:24, fields:[{key:"bankCode",label:"Banque",from:4,to:7},{key:"account",label:"Compte",from:7,to:24}]},
+  "NO": { len:15, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"account",label:"Compte",from:8,to:15}]},
+  // Non-SEPA but common
+  "CH": { len:21, fields:[{key:"bankCode",label:"Banque",from:4,to:9},{key:"account",label:"Compte",from:9,to:21}]},
+  "GB": { len:22, fields:[{key:"bankCode",label:"Banque",from:4,to:8},{key:"branchCode",label:"Sort code",from:8,to:14},{key:"account",label:"Compte",from:14,to:22}]}
+};
 
-      const logs = [];
-      logs.push(`Saisie (brut): ${raw}`);
-      logs.push(`Normalisé: ${iban}`);
+const SEPA_COUNTRIES = new Set([
+  "AT","BE","BG","CH","CY","CZ","DE","DK","EE","ES","FI","FR","GB","GR","HR","HU","IE","IS","IT","LI","LT","LU","LV","MC","MT","NL","NO","PL","PT","RO","SE","SI","SK","SM","VA"
+]);
 
-      if (!iban){
-        setStatus("En attente", "secondary");
-        showMsg("Veuillez saisir un IBAN.", "warning");
-        log(logs);
-        return;
-      }
+function safeText(v){ return String(v ?? "").trim(); }
 
-      if (iban.length < 4){
-        setStatus("Incomplet", "warning");
-        showMsg("IBAN incomplet.", "warning");
-        log(logs);
-        return;
-      }
+function formatBbanPretty(country, parts){
+  // Pretty for the UI line "RIB (format)"
+  if (country === "FR"){
+    return formatRibPretty(parts.bankCode, parts.branchCode, parts.account, parts.ribKey);
+  }
+  if (country === "ES"){
+    return [parts.bankCode, parts.branchCode, parts.ribKey, parts.account].filter(Boolean).join(" ").trim();
+  }
+  if (country === "HR"){
+    return [parts.bankCode, parts.account].filter(Boolean).join(" ").trim();
+  }
+  // Generic: group by 4 from BBAN
+  const bban = parts.bban || "";
+  return bban.replace(/(.{4})/g, "$1 ").trim();
+}
 
-      const country = iban.slice(0,2);
-      const ibanKey = iban.slice(2,4);
+function parseIban(iban){
+  const country = iban.slice(0,2);
+  const checksum = iban.slice(2,4);
+  const spec = IBAN_SPECS[country] || null;
 
-      $("outCountry").textContent = country;
-      $("outIbanKey").textContent = ibanKey;
+  const out = {
+    iban,
+    ibanPretty: formatIbanPretty(iban),
+    country,
+    checksum,
+    bban: iban.slice(4),
+    specKnown: !!spec,
+    expectedLen: spec?.len ?? null,
+    parts: {}
+  };
 
-      // Validité MOD97
-      let mod = null;
-      try{
-        mod = ibanMod97(iban);
-        logs.push(`MOD97 remainder: ${mod}`);
-      }catch(e){
-        logs.push(`Erreur MOD97: ${e?.message ?? e}`);
-      }
+  if (spec){
+    for (const f of spec.fields){
+      out.parts[f.key] = iban.slice(f.from, f.to);
+    }
+  }
 
-      if (mod === 1) setStatus("IBAN valide", "success");
-      else setStatus("IBAN non valide", "danger");
+  // Normalize: always expose these keys for UI compatibility
+  const p = out.parts;
+  p.bankCode = p.bankCode || "";
+  p.branchCode = p.branchCode || "";
+  p.account = p.account || "";
+  p.ribKey = p.ribKey || "";
+  p.bban = out.bban;
 
-      if (country !== "FR"){
-        showMsg(
-          `IBAN détecté <span class="mono">${country}</span>. Ce module extrait précisément <b>code banque / guichet / compte / clé RIB</b> uniquement pour les IBAN français (FR).`,
-          "info"
-        );
-        log(logs);
-        return;
-      }
+  return out;
+}
 
-      // FR = 27 caractères (FR + 2 + 23 BBAN)
-      if (iban.length !== 27){
-        showMsg(`Longueur IBAN FR attendue: <b>27</b>. Longueur détectée: <b>${iban.length}</b>.`, "warning");
-      }
 
-      const bban = iban.slice(4); // 23 chars
-      logs.push(`BBAN (23): ${bban}`);
 
-      if (bban.length < 23){
-        showMsg("BBAN incomplet pour un IBAN FR (23 caractères attendus après FRkk).", "warning");
-        log(logs);
-        return;
-      }
+function setOutputsFromParsed(parsed){
+  const p = parsed.parts;
 
-      const bankCode = bban.slice(0,5);
-      const branchCode = bban.slice(5,10);
-      const account = bban.slice(10,21);
-      const ribKey = bban.slice(21,23);
+  $("outCountry").textContent = parsed.country || "—";
+  $("outIbanKey").textContent = parsed.checksum || "—";
 
-      $("outBankCode").textContent = bankCode;
-      $("outBranchCode").textContent = branchCode;
-      $("outAccount").textContent = account;
-      $("outRibKey").textContent = ribKey;
-	  $("outRibPretty").textContent = formatRibPretty(bankCode, branchCode, account, ribKey);
+  $("outBankCode").textContent   = p.bankCode || "—";
+  $("outBranchCode").textContent = p.branchCode || "—";
+  $("outAccount").textContent    = p.account || (parsed.bban ? parsed.bban : "—");
+  $("outRibKey").textContent     = p.ribKey || "—";
+  $("outRibPretty").textContent  = formatBbanPretty(parsed.country, { ...p, bban: parsed.bban }) || "—";
+}
 
-      logs.push(`Code banque: ${bankCode}`);
-      logs.push(`Code guichet: ${branchCode}`);
-      logs.push(`Compte: ${account}`);
-      logs.push(`Clé RIB: ${ribKey}`);
+function applyLocalLookupIfAny(parsed){
+  // Local lookup currently only reliable for FR (BANK_REF keyed by 5-digit bankCode).
+  if (parsed.country === "FR" && parsed.parts.bankCode){
+    const ref = lookupBank(parsed.parts.bankCode);
+    if (ref){
+      $("outBankName").textContent = ref.name || "—";
+      $("outBic").textContent = ref.bic || "—";
+      return true;
+    }
+  }
+  return false;
+}
 
-      // Contrôle clé RIB (recalcul)
-      let computed = null;
-      try{
-        computed = computeRibKey(bankCode, branchCode, account);
-        logs.push(`Clé RIB recalculée: ${computed}`);
-        if (computed === ribKey){
-          logs.push("Contrôle clé RIB: OK");
-        }else{
-          logs.push("Contrôle clé RIB: ECART");
-          showMsg(
-            `Attention : la clé RIB extraite (<span class="mono">${ribKey}</span>) ne correspond pas à la clé recalculée (<span class="mono">${computed}</span>).`,
-            "warning"
-          );
-        }
-      }catch(e){
-        logs.push(`Erreur calcul clé RIB: ${e?.message ?? e}`);
-      }
+async function applyOnlineLookupIfEnabled(parsed, logs){
+  if (!isOnlineLookupEnabled()) return;
 
-      // Lookup banque/BIC
-      const ref = lookupBank(bankCode);
-      if (ref){
-        $("outBankName").textContent = ref.name || "—";
-        $("outBic").textContent = ref.bic || "—";
-        logs.push(`Lookup banque: ${ref.name ?? "—"}`);
-        logs.push(`Lookup BIC: ${ref.bic ?? "—"}`);
-      }else{
-        $("outBankName").textContent = "Inconnu (à compléter dans le référentiel)";
-        $("outBic").textContent = "Inconnu (à compléter dans le référentiel)";
-        logs.push("Lookup banque/BIC: non trouvé (code banque absent du référentiel)");
-      }
+  try{
+    const r = await lookupBankOnlineOpenIban(parsed.iban);
+    logs.push(`OpenIBAN: valid=${r.valid} bankName=${r.bankName || "—"} bic=${r.bic || "—"}`);
 
-      log(logs);
-
-      // Message de synthèse
-      if (mod === 1){
-        showMsg(`Décodage terminé. IBAN <b>valide</b>.`, "success");
-      }else{
-        showMsg(`Décodage terminé, mais IBAN <b>non valide</b> (MOD97≠1). Vérifiez la saisie.`, "danger");
-      }
+    // Prefer online only if local didn't provide
+    if (!$("outBankName").textContent || $("outBankName").textContent.includes("Inconnu") || $("outBankName").textContent === "—"){
+      if (r.bankName) $("outBankName").textContent = r.bankName;
+    }
+    if (!$("outBic").textContent || $("outBic").textContent.includes("Inconnu") || $("outBic").textContent === "—"){
+      if (r.bic) $("outBic").textContent = r.bic;
     }
 
-    // Estimation de largeur en mm (jsPDF ne donne pas toujours une mesure parfaite,
+    // If OpenIBAN returns a bankCode, align UI (for DE/NL/BE/...)
+    if (r.bankCode && (!$("outBankCode").textContent || $("outBankCode").textContent === "—")){
+      $("outBankCode").textContent = r.bankCode;
+    }
+
+    // Fill bank address fields in modal if empty
+    const bankAddr = [r.zip, r.city].filter(Boolean).join(" ");
+    if (bankAddr){
+      const ta = document.getElementById("ribBankAddress");
+      if (ta && !ta.value.trim()) ta.value = bankAddr;
+    }
+  }catch(e){
+    logs.push(`OpenIBAN: erreur (${e?.message ?? e})`);
+  }
+}
+
+// ---------------------------
+// Main decode (multi-country)
+// ---------------------------
+async function decode(){
+  hideMsg();
+  clearOutputs();
+
+  const raw = $("iban").value;
+  const iban = normalizeIban(raw);
+
+  const logs = [];
+  logs.push(`Saisie (brut): ${raw}`);
+  logs.push(`Normalisé: ${iban}`);
+
+  if (!iban){
+    setStatus("En attente", "secondary");
+    showMsg("Veuillez saisir un IBAN.", "warning");
+    log(logs);
+    return;
+  }
+  if (iban.length < 4){
+    setStatus("Incomplet", "warning");
+    showMsg("IBAN incomplet.", "warning");
+    log(logs);
+    return;
+  }
+
+  const parsed = parseIban(iban);
+  logs.push(`Pays: ${parsed.country} ; clé: ${parsed.checksum} ; BBAN: ${parsed.bban}`);
+
+  // Validité MOD97
+  let mod = null;
+  try{
+    mod = ibanMod97(iban);
+    logs.push(`MOD97 remainder: ${mod}`);
+  }catch(e){
+    logs.push(`Erreur MOD97: ${e?.message ?? e}`);
+  }
+  if (mod === 1) setStatus("IBAN valide", "success");
+  else setStatus("IBAN non valide", "danger");
+
+  // Check length vs registry map (if known)
+  if (parsed.expectedLen && iban.length !== parsed.expectedLen){
+    showMsg(
+      `Longueur IBAN attendue pour <span class="mono">${parsed.country}</span> : <b>${parsed.expectedLen}</b>. Longueur détectée : <b>${iban.length}</b>.`,
+      "warning"
+    );
+  }else if (!parsed.specKnown){
+    showMsg(
+      `Pays <span class="mono">${parsed.country}</span> : format BBAN non détaillé dans le module (affichage BBAN générique).`,
+      "info"
+    );
+  }
+
+  // Fill UI from parsed parts
+  setOutputsFromParsed(parsed);
+
+  // Country-specific extra checks
+  if (parsed.country === "FR" && parsed.parts.bankCode && parsed.parts.branchCode && parsed.parts.account){
+    // Recompute RIB key and warn if mismatch
+    try{
+      const computed = computeRibKey(parsed.parts.bankCode, parsed.parts.branchCode, parsed.parts.account);
+      logs.push(`Clé FR recalculée: ${computed}`);
+      if (parsed.parts.ribKey && computed !== parsed.parts.ribKey){
+        logs.push("Contrôle clé FR: ECART");
+        showMsg(
+          `Attention : la clé FR extraite (<span class="mono">${parsed.parts.ribKey}</span>) ne correspond pas à la clé recalculée (<span class="mono">${computed}</span>).`,
+          "warning"
+        );
+      }else{
+        logs.push("Contrôle clé FR: OK");
+      }
+    }catch(e){
+      logs.push(`Erreur calcul clé FR: ${e?.message ?? e}`);
+    }
+  }
+
+  // Lookup banque / BIC
+  $("outBankName").textContent = "—";
+  $("outBic").textContent = "—";
+
+  const localOk = applyLocalLookupIfAny(parsed);
+  if (!localOk){
+    $("outBankName").textContent = "Inconnu (lookup)";
+    $("outBic").textContent = "Inconnu (lookup)";
+  }
+
+  
+
+  // SEPA flag (for PDF & QR helper text)
+  logs.push(`SEPA: ${SEPA_COUNTRIES.has(parsed.country) ? "oui" : "non/indéterminé"}`);
+
+  log(logs);
+
+  if (mod === 1){
+    showMsg(`Décodage terminé. IBAN <b>valide</b>.`, "success");
+  }else{
+    showMsg(`Décodage terminé, mais IBAN <b>non valide</b> (MOD97≠1). Vérifiez la saisie.`, "danger");
+  }
+
+  // If modal is open, refresh preview + QR
+  const modalEl = document.getElementById("ribModal");
+  if (modalEl && modalEl.classList.contains("show")){
+    fillRibModalFromAnalyzer();
+  }
+}
+
+
+// Estimation de largeur en mm (jsPDF ne donne pas toujours une mesure parfaite,
     // mais getTextWidth() est suffisamment bon pour un tampon)
     function textWidthMM(doc, text){
       // jsPDF renvoie une largeur en "unit" du doc (ici mm)
@@ -1449,18 +1657,18 @@ document.getElementById("btnGenerateRibPdf").addEventListener("click", async () 
     });
 
     $("btnCopyRib").addEventListener("click", async () => {
-      const bban =
-        String($("outBankCode").textContent) +
-        String($("outBranchCode").textContent) +
-        String($("outAccount").textContent) +
-        String($("outRibKey").textContent);
-
-      if (bban.includes("—") || bban.length < 23){
-        showMsg("Rien à copier : commencez par décoder un IBAN FR.", "warning");
+      const iban = normalizeIban($("iban").value);
+      if (!iban || iban.length < 6){
+        showMsg("Rien à copier : saisissez un IBAN.", "warning");
+        return;
+      }
+      const bban = iban.slice(4);
+      if (!bban){
+        showMsg("BBAN indisponible.", "warning");
         return;
       }
       await copyToClipboard(bban);
-      showMsg("BBAN (RIB) copié dans le presse-papiers.", "success");
+      showMsg("BBAN copié dans le presse-papiers.", "success");
     });
 
     $("btnCopyAll").addEventListener("click", async () => {
